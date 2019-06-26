@@ -1,0 +1,25 @@
+\lstdefinelanguage[ARM]{Herd}{
+  alsoletter={-,.},
+  morecomment=[n]{(*}{*)},
+  commentstyle=\color{black!75},
+  boxpos=t,
+  showstringspaces=false,
+%   basicstyle=\sffamily,
+%   identifierstyle=\color{blue!60!black},
+%%% keywords:
+  classoffset=0,
+  morekeywords=[1]{let,as,range,acyclic,irreflexive,empty},
+  sensitive=true,
+  keywordstyle=\bfseries\color{black},
+%%% candidate execution:
+  classoffset=1,
+  morekeywords=[1]{fr,fre,fri,co,coe,coi,rf,rfe,rfi,po,addr,data,ctrl,rmw,po-loc},
+  sensitive=true,
+  keywordstyle=\color{blue!60!black},
+%%% sets:
+  classoffset=2,
+  morekeywords=[1]{W,R,ISB,A,Q,L,dmb.full,dmb.ld,dmb.st},
+  sensitive=true,
+  keywordstyle=\bfseries\color{blue!60!black},
+  classoffset=0,
+}[keywords]

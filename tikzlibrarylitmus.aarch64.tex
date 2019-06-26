@@ -1,0 +1,29 @@
+\litmusset{
+  AArch64/.style={
+    /litmus/listing options/.if defined=then {
+      /litmus/listing options/.prefix={language=AArch64,}
+    },
+    /litmus/base language,
+    % Generated in pp.ml (pp_brief_write_kind):
+    /litmus/mem access/Wrel/.code={W\textsubscript{rel}},
+    /litmus/mem access/Wexc/.code={W\textsubscript{exc}},
+    /litmus/mem access/We-r/.code={W\textsubscript{e-r}},
+    % Generated in pp.ml (pp_brief_read_kind):
+    /litmus/mem access/Racq/.code={R\textsubscript{acq}},
+    /litmus/mem access/Rwacq/.code={R\textsubscript{wacq}},
+    /litmus/mem access/Rexc/.code={R\textsubscript{exc}},
+    /litmus/mem access/Re-a/.code={R\textsubscript{e-a}},
+    /litmus/mem access/Rnt/.code={R\textsubscript{nt}},
+    /litmus/isb/.litmus relation=litmusIndigo,
+    /litmus/ctrl+isb/.litmus relation=litmusIndigo,
+    /litmus/dmb/.litmus relation=litmusDarkGreen,
+    /litmus/dmb st/.litmus relation=litmusDarkGreen,
+    /litmus/dmb ld/.litmus relation=litmusDarkGreen,
+    /litmus/dsb/.litmus relation=litmusDarkGreen,
+    /litmus/dsb st/.litmus relation=litmusDarkGreen,
+    /litmus/dsb ld/.litmus relation=litmusDarkGreen,
+    /litmus/.cd scope={
+      every AArch64/.try,
+    },
+  },
+}

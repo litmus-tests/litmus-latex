@@ -1,0 +1,1594 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                    %
+%         rmem executable model                                      %
+%                                                                    %
+%   Shaked Flur, University of Cambridge                             %
+%   Jon French, University of Cambridge                              %
+%   Kathryn Gray, University of Cambridge (when this work was done)  %
+%   Robert Norton-Wright, University of Cambridge                    %
+%   Christopher Pulte, University of Cambridge                       %
+%   Susmit Sarkar, University of St Andrews                          %
+%   Peter Sewell, University of Cambridge                            %
+%                                                                    %
+%  This file is copyright 2010-2017 by the authors above.            %
+%                                                                    %
+%  All rights reserved.                                              %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% This library should be loaded using '\usetikzlibrary{litmus}'
+% See tikz_example/example.tex for details on how to use this library
+
+%%% TODO:
+% - Add @ to all the keys that should not be accessible to users.
+% - Evaluating multiple styles in a ".cd scope" is not safe, as the
+%   first style might change the default path.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\RequirePackage{etoolbox}
+
+% Load pgf/tikz libraries
+\usepgflibrary{mykeys}
+\usetikzlibrary{arrows.meta}
+\usetikzlibrary{positioning}
+\usetikzlibrary{calc}
+\usetikzlibrary{chains}
+\usetikzlibrary{scopes}
+\usetikzlibrary{matrix}
+\usetikzlibrary{fit}
+\usetikzlibrary{backgrounds}
+\usetikzlibrary{math}
+
+% \lit@ifnodeexists{<name or alias>}{<true>}{<false>}
+\newcommand{\lit@ifnodeexists}[1]{%
+  \ifcsequal{pgf@sh@pi@#1}{pgfpictureid}%
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\pgfkeys{
+  /litmus/.is family,
+  %%% pgf BUG: when defining "<path>/.search also=..." and then calling
+  %%% "\pgfkeys{<path>/<unknown key>}" the error message complains that
+  %%% "/handlers/.unknown/.@cmd" does not exist, instead of complaining
+  %%% about "<path>/<unknown key>", this makes debugging harder.
+  /litmus/.search also={/tikz},
+  %
+  % This is a bit of a hack to allow un-prefixed /litmus keys when
+  % /tikz is the default path.
+  % NOTE: /tikz/.unknown/.@cmd calls '/errors/unknown key' after
+  % trying everything and failing.
+  /litmus/append to tikz path search/.style={
+    % Setup things only if we have not already done it
+    /errors/unknown key/original/.@cmd/.if defined=then {} else {
+      % Save a copy of the original '/errors/unknown key'
+      /utils/exec={%
+        \pgfkeysgetvalue{/errors/unknown key/.@cmd}{\lit@temp@unknown}%
+        \pgfkeyslet{/errors/unknown key/original/.@cmd}{\lit@temp@unknown}%
+      },
+      % Redefine '/errors/unknown key' to look in /litmus before failing
+      /errors/unknown key/.style 2 args={
+        % ##1 is the unknown key (fully qualified)
+        % ##2 is the value passed to the key
+        ##1/.get key parts=\lit@key,
+        /utils/ifboolexpr={test {\ifdefstring{\lit@keypath}{/tikz}}} then {
+          % /tikz/.unknown uses \pgfkeys (instead of \pgfkeysalso) to
+          % call "/errors/unknown key" so we need to switch back to /tikz
+          /tikz,
+          /litmus/\lit@keyname/.try={##2},
+          /errors/unknown key/original/.retry={##1}{##2},
+        } else {
+          /errors/unknown key/original={##1}{##2},
+        },
+      },
+      % By forwarding the keys "/errors/unknown key/.code 2 args" and
+      % "/errors/unknown key/.style 2 args" we make it harder for
+      % someone to overwrite the code above (instead the saved copy
+      % will be overwritten).
+      /errors/unknown key/.code 2 args/.forward to=/errors/unknown key/original/.code 2 args,
+      /errors/unknown key/.style 2 args/.forward to=/errors/unknown key/original/.style 2 args,
+    },
+  },
+}
+\def\litmusset{\pgfqkeys{/litmus}}
+
+\def\assem{\verb}
+
+% By default \assem is \verb which cannot be used in macro arguments.
+% Whenever we need to pass \assem in an argument we pass this instead:
+\def\lit@internal@assem#1{{\ttfamily #1}}
+
+% \chaincount{<chain>} returns the number of nodes on the chain
+\newcommand{\chaincount}[1]{\csuse{tikz@lib@chain@count@#1}}
+
+\newif\iflit@assem\lit@assemtrue
+\litmusset{is assem litmus/.is if flag=lit@assem}
+
+\newif\iflit@events\lit@eventstrue
+\litmusset{is events litmus/.is if flag=lit@events}
+
+\newif\iflit@hide@line\lit@hide@linefalse
+\litmusset{hide line/.is global if flag=lit@hide@line}
+
+\newif\iflit@needs@end@row\lit@needs@end@rowfalse
+
+\newcounter{lit@ioid@sub}
+
+\newif\iflit@last@inst\lit@last@instfalse
+
+\def\lit@add@row@after#1#2{%
+  % #1 - ioid of the instruction above
+  % #2 - node text
+  \iflit@assem%
+    \lit@matrixendrow%
+    \stepcounter{lit@ioid@sub}%
+    \node[/litmus/assem/.expanded={#1-\arabic{lit@ioid@sub}}] {#2};%
+  \fi%
+}
+
+% This is the end-of-row macro for 'instructions' matrix.
+\def\litmusendinst{\futurelet\lit@tok\lit@endinst}
+\def\lit@endinst{%
+  \ifx\lit@tok\egroup%
+    \global\lit@last@insttrue%
+  \else%
+    \global\lit@last@instfalse%
+  \fi%
+  \iflit@assem%
+    \iflit@hide@line%
+      \iflit@last@inst%
+        \PackageWarning{litmus-tikz-library}{last line can not be completely hidden (\lit@ioid)}%
+      \fi%
+    \else%
+      \pgfkeysifdefined{/tikz/pics/\lit@ioid/.@cmd}{%
+        \iflit@events%
+          \pgfmatrixnextcell%
+          \pic {\lit@ioid};%
+        \fi%
+      }{}%
+      % add rows as requested
+      \pgfkeysifdefined{/litmus/assem \lit@ioid/insert rows after/.@cmd}{%
+        \setcounter{lit@ioid@sub}{0}%
+        \litmusset{assem \lit@ioid/insert rows after}%
+      }{}%
+      \iflit@last@inst\else%
+        \lit@matrixendrow%
+      \fi%
+    \fi%
+  \else%
+    \pgfkeysifdefined{/tikz/pics/\lit@ioid/.@cmd}{%
+      % The matrix must end with \pgfmatrixendrow (the one at the end
+      % of this macro) so we have to do all the other \pgfmatrixendrow
+      % just before the \pic, except, of course, for the very first \pic
+      \iflit@needs@end@row%
+        \lit@matrixendrow%
+      \fi%
+      \lit@needs@end@rowtrue%
+      \pic {\lit@ioid};%
+    }{}%
+  \fi%
+  \iflit@last@inst%
+    \expandafter\lit@matrixendrow%
+  \fi%
+}
+
+\def\lit@matrixendrow{\expandafter\pgfmatrixendrow\expandafter[\lit@add@space@after@row]}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% typeset memory footprint
+
+\newif\iflit@mixed@size\lit@mixed@sizetrue
+\litmusset{is mixed-size/.is if flag=lit@mixed@size}
+
+\litmusset{
+  non-mixed-size/.style={
+    /litmus/memfp/.code n args={3}{%
+      \tikzmath{
+        let \addr = ##1;
+        let \offs = ##2;
+        let \size = ##3;
+        if \offs==0 then { print{\addr}; }
+        else { print{\addr+\offs}; };
+      }%
+    },
+    /litmus/memrf/.code 2 args=rf,
+    /litmus/is mixed-size=false,
+  },
+}
+
+\litmusset{
+  old-mixed-size/.style={
+    /litmus/memfp/.code n args={3}{%
+      \tikzmath{
+        let \addr = ##1;
+        let \offs = ##2;
+        let \size = ##3;
+        if \offs==0 then { print{\addr/\size}; }
+        else { print{\addr+\offs/\size}; };
+      }%
+    },
+    /litmus/memrf/.code 2 args={%
+      \def\memrf@temp{\@gobble}%
+      \foreach \i/\j in {##2} {%
+        \tikzmath{\size = int(\j - \i + 1);}%
+        \ifnum\i=\z@%
+          \xdef\memrf@temp{\memrf@temp,##1/\size}%
+        \else%
+          \xdef\memrf@temp{\memrf@temp,##1+\i/\size}%
+        \fi%
+      }%
+      rf\,\memrf@temp%
+    },
+    /litmus/is mixed-size=true,
+  },
+}
+
+\litmusset{
+  mixed-size/.style={
+    /litmus/memfp/.code n args={3}{%
+      \tikzmath{
+        let \addr = ##1;
+        let \offs = ##2;
+        let \size = ##3;
+        \i = int(\offs + \size - 1);
+        if \size==1 then { print{\addr[\offs]}; }
+        else { print{\addr[\offs..\i]}; };
+      }%
+    },
+    /litmus/memrf/.code 2 args={%
+      \def\memrf@temp{\@gobble}%
+      \foreach \i/\j in {##2} {%
+        \ifx\i\j%
+          \xdef\memrf@temp{\memrf@temp,\i}%
+        \else%
+          \xdef\memrf@temp{\memrf@temp,\i..\j}%
+        \fi%
+      }%
+      rf\,##1[\memrf@temp]%
+    },
+    /litmus/is mixed-size=true,
+  },
+}
+
+\litmusset{non-mixed-size}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcount\maxassemlines
+
+\newcommand{\lit@check@exists}{%
+  {%
+    \def\lit@check@exists@do##1{%
+      \ifinlist{##1}{\lit@exists@list}{}{% else
+        \PackageError{litmus-tikz-library}{event '##1' which you tried to change does not exist}{}%
+      }%
+    }%
+    \forlistloop{\lit@check@exists@do}{\lit@check@exists@list}%
+  }%
+}
+
+\litmusset{
+  litmus arrow/.tip={Stealth[length=0.5em,inset=0.1em]},
+  litmus internal/.style={
+    /utils/exec={\global\maxassemlines=0},
+    % If the assem/event 'text height' of the first instructions are
+    % not identical the thread headers will not be aligned
+    /tikz/start chain=threads going {/tikz/right=of \tikzchainprevious.north east, /tikz/matrix anchor=north west},
+    /tikz/>=litmus arrow,
+    /utils/exec={
+      \gdef\lit@exists@list{}
+      \gdef\lit@check@exists@list{}
+    },
+    /tikz/execute at end scope=\lit@check@exists,
+  },
+  kind/.is choice,
+  kind/.default=full,
+  kind/full/.style={
+    /litmus/is assem litmus=true,
+    /litmus/is events litmus=true,
+    /litmus/simple instructions/.style={/litmus/@simple full},
+    /litmus/litmus internal,
+    /litmus/threads distance/.initial=3em,
+    /litmus/header to instructions distance/.initial=0pt,
+    /litmus/draw thread header/.style=,
+    /litmus/disable edge routing,
+    /litmus/.cd scope={
+      every litmus/.try,
+      every full litmus/.try,
+    },
+  },
+  kind/assem/.style={
+    /litmus/is assem litmus=true,
+    /litmus/is events litmus=false,
+    /litmus/simple instructions/.style={/litmus/@simple assem},
+    /litmus/litmus internal,
+    /litmus/threads distance/.initial=0pt,
+    /litmus/header to instructions distance/.initial=0pt,
+    /litmus/draw thread header/.style=,
+    /litmus/disable edge routing,
+    /litmus/.cd scope={
+      every litmus/.try,
+      every assem litmus/.try,
+    },
+%     /litmus/event/.append style=/litmus/hide,
+%     /litmus/events box/.style=/litmus/hide,
+    /litmus/instruction relations/.style=/litmus/hide,
+    /litmus/event relations/.style=/litmus/hide,
+  },
+  kind/events/.style={
+    /litmus/is assem litmus=false,
+    /litmus/is events litmus=true,
+    /litmus/simple instructions/.style={/litmus/@simple events},
+    /litmus/litmus internal,
+    /litmus/threads distance/.initial=3em,
+    /litmus/header to instructions distance/.initial=0.5ex,
+    /litmus/draw thread header/.style={/tikz/rectangle, /tikz/draw},
+    /litmus/enable edge routing,
+    /litmus/.cd scope={
+      every litmus/.try,
+      every events litmus/.try,
+    },
+    /litmus/code label position=none, % don't show code labels...
+    % ...and change the key so it cannot be changed (e.g. by 'every litmus')
+    /litmus/code label position/.code=,
+    /litmus/assem internal/.append style=/litmus/hide,
+  },
+}
+
+% This is a hack for .ps as it does not support opacity:
+\@ifclasswith{standalone}{dvips}{
+  \litmusset{
+    kind/events/.append style={
+      /litmus/assem internal/.append style={/tikz/scale=0.001, /tikz/transform shape},
+    },
+  }
+}{}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\tikzset{
+  % The alias key does not work on matrices, that breaks 'on chain',
+  % we fix it by adding another node with the expected name
+  matrix on chain/.style={
+    /tikz/matrix,
+    /tikz/on chain={#1},
+    % We forward all the alias arguments to 'matrix alias' and use it
+    % to collect the aliases in \lit@alias@temp (csv)
+    /utils/exec={\def\lit@alias@temp{\@gobble}},
+    /temp/matrix alias/.code={\xdef\lit@alias@temp{\lit@alias@temp,##1}},
+    /tikz/alias/.forward to=/temp/matrix alias,
+    % We do not want to collect aliases in the cells
+    /tikz/execute at begin cell={\pgfkeys{/temp/matrix alias/.code={}}},
+    % Add to the end of the path a new simple node with all the aliases
+    /tikz/append after command={
+      node[fit=(\tikzlastnode),
+        minimum size=0, inner sep=0, outer sep=0,
+        alias/.list/.expand once=\lit@alias@temp,
+      ] {}
+    },
+  },
+}
+
+% Hold the typical height and depth of assem text
+\newlength{\assemheight}
+\newlength{\assemdepth}
+
+\litmusset{
+  add thread header/.is flag=false,
+  thread/.style={
+    /litmus/thread id/.store in=\lit@tid,
+    /litmus/thread id={#1},
+    /litmus/add thread header,
+    /litmus/.cd scope={
+      every thread/.try=#1,
+      thread #1/.try,
+    },
+  },
+  thread header text/.store in=\lit@thread@header@text,
+  thread header text={Thread~\lit@tid},
+  thread header/.style={
+    /tikz/alias/.expanded={thread \lit@tid\space header},
+    /litmus/draw thread header/.try,
+    /tikz/node distance/.value of=/litmus/header to instructions distance,
+    /litmus/.cd scope={
+      every thread header/.try/.expand once=\lit@tid,
+      thread \lit@tid\space header/.try,
+    },
+  },
+  ioid/.global store in=\lit@ioid,
+  the code label/.global store in=\lit@code@label,
+  instructions/.style={
+    /utils/if no value={#1} then {} else {
+      % There is no thread scope, but we still need to set \lit@tid.
+      % We use global because '/tikz/append after command' is executed
+      % in a different group.
+      /litmus/thread id/.global store in=\lit@tid,
+      /litmus/thread id={#1},
+    },
+    /litmus/the code label=,
+    % 'node distance' must be set before 'on chain'
+    /tikz/node distance/.value of=/litmus/threads distance,
+    /tikz/matrix on chain=threads,
+    /tikz/column sep=0.5em,
+    /utils/exec={
+      % Set \assemheight and \assemdepth to reasonable values
+      \settoheight{\assemheight}{\pgfinterruptpicture\lit@internal@assem{X[/}\endpgfinterruptpicture}
+      \global\assemheight=\assemheight
+      \settodepth{\assemdepth}{\pgfinterruptpicture\lit@internal@assem{gjpqyQ[,/}\endpgfinterruptpicture}
+      \global\assemdepth=\assemdepth
+    },
+    /litmus/is assem litmus/.if true=then {
+      /litmus/is events litmus/.if true=then {
+        /tikz/row sep={3ex,between origins}
+      } else {
+        /tikz/row sep={\assemheight+\assemdepth+1pt,between origins}
+      }
+    } else {
+      /tikz/row sep={7ex,between origins}
+    },
+    /tikz/inner sep=0,
+    /tikz/outer sep=0,
+    /litmus/.cd scope={
+      every instructions/.try,
+    },
+    /utils/exec={
+      % Set \assemrowsep to the 'row sep' length part:
+      \begingroup
+        \def\@tempA##1,##2\par{##1}
+        \edef\@tempB{\pgfmatrixrowsep}
+        \edef\@tempC{\endgroup\noexpand\xdef\noexpand\assemrowsep{\expandafter\@tempA\@tempB,\par}}
+      \@tempC
+    },
+    /litmus/add space after row/.store in=\lit@add@space@after@row,
+    /litmus/add space after row=0pt,
+    /tikz/execute at end matrix={%
+      \ifnum\pgfmatrixcurrentrow>\maxassemlines\relax%
+        \global\maxassemlines=\pgfmatrixcurrentrow%
+      \fi%
+    },
+    /litmus/add thread header/.if true=then {
+      /tikz/append after command={
+        node[%
+          % We check if \tikz@node@at has changed (becuase of user defined
+          % styles), and if it has not, we set it to be above the instructions
+          /utils/exec={\let\lit@temp@node@at=\tikz@node@at},
+          /litmus/thread header,
+          /utils/ifboolexpr={%
+            test {\ifdefequal{\tikz@node@at}{\lit@temp@node@at}}%
+          } then {above=of \tikzlastnode},
+        ] {\lit@thread@header@text}%
+      },
+    },
+  },
+}
+
+\newif\iflit@simple@endcell\lit@simple@endcelltrue
+\def\lit@simple@event@endcell{\iflit@simple@endcell\egroup;\fi}
+
+\def\lit@simple@cell#1{%
+  \@ifnextchar !{%
+    \lit@simple@endcellfalse\@gobble%
+  }{% else
+    \lit@simple@endcelltrue #1%
+  }%
+}
+\def\lit@simple@event#1:{%
+  \node[/litmus/.cd scope={event={#1}}] \bgroup%
+    % when using "text width" tikz wraps the node text with a minipage that
+    % redefines \\, we redefine it again so that "/tikz/execute at end cell"
+    % can run as expected
+    \let\\=\pgfmatrixendrow%
+}
+
+
+\def\lit@simple@assem{%
+  \node[/litmus/assem] \bgroup%
+    % when using "text width" tikz wraps the node text with a minipage that
+    % redefines \\, we redefine it again so that "/tikz/execute at end cell"
+    % can run as expected
+    \let\\=\pgfmatrixendrow%
+    \assem%
+}
+
+% a few wrappers of 'instructions' that make it easier to type simple tests
+\litmusset{
+  events column/.style={ % e.g.: a:R x=0
+    /tikz/execute at begin cell={\lit@simple@cell\lit@simple@event},
+    /tikz/execute at end cell={\expandafter\lit@simple@event@endcell},
+  },
+  assem column/.style={ % e.g.: |LDR W1,[X2]|
+    /tikz/execute at begin cell={\lit@simple@cell\lit@simple@assem},
+    /tikz/execute at end cell={\expandafter\lit@simple@event@endcell},
+  },
+  @simple instructions/.style={
+    /litmus/add thread header,
+    /litmus/instructions/.expanded=\chaincount{threads},
+    /litmus/.cd scope={
+      every simple instructions/.try,
+    },
+  },
+  @simple events/.style={
+    /litmus/@simple instructions,
+    /tikz/column 1/.style=/litmus/events column,
+    /litmus/.cd scope={
+      every simple events/.try,
+    },
+  },
+  @simple assem/.style={
+    /litmus/@simple instructions,
+    /tikz/column 1/.style=/litmus/assem column,
+    /litmus/.cd scope={
+      every simple assem/.try,
+    },
+  },
+  @simple full/.style={
+    /litmus/@simple instructions,
+    /tikz/column 1/.style=/litmus/assem column,
+    /tikz/column 2/.style=/litmus/events column,
+    /litmus/.cd scope={
+      every simple full/.try,
+    },
+  },
+}
+
+\newcommand{\lit@auxout@comtextwidth}[2]{%
+  \immediate\write\@auxout{\string\lit@load@width{#1}{#2}}
+}
+
+\newcommand{\lit@load@width}[2]{%
+  \csgdef{#1@litmusinstructionswidths}{#2}%
+  \foreach \w [count=\t from 0] in {#2}{%
+    \csxdef{#1@litmusinstructionswidth@\t}{\w}%
+  }%
+}
+
+\pgfmathdeclarefunction{computedwidthofthread}{2}{%
+  \begingroup%
+    \ifcsdef{#1@litmusinstructionswidth@#2}{%
+      \edef\res{\csuse{#1@litmusinstructionswidth@#2}}%
+      \expandafter\pgf@x\res\relax%
+    }{% else
+      %%% NOTE: ^^J is a line-break, litmus.mk is looking for '^run latex again.'
+      \PackageWarning{litmus-tikz-library}{Computed assem width of #1 is not available,^^Jrun latex again.}%
+      \pgf@x0pt\relax%
+    }%
+    \pgfmathreturn\pgf@x%
+  \endgroup%
+}
+\pgfkeys{
+  /pgf/declare function={
+    computedwidthof(\@uid)=computedwidthofthread("\@uid",\lit@tid);
+  },
+}
+
+\colorlet{code label color}{black!50}
+
+\litmusset{
+  add row after/.style 2 args={%
+    /litmus/assem #1/insert rows after/.append code={\lit@add@row@after{#1}{#2}}%
+  },
+  collect eiids/.style={ % #1 - an ioid
+    /litmus/#1/eiids/.if defined value={\lit@eiids} then {
+      % Barriers have no \pic but we still want an eiid comment
+      /litmus/assem #1/eiids/.initial/.expanded=\lit@eiids,
+    } else {
+      /tikz/#1/eiids/.if defined value={\lit@eiids} then {
+        /litmus/assem #1/eiids/.initial/.expanded=\lit@eiids,
+      } else {
+        /tikz/pics/#1-eiids/.@cmd/.if defined=then {
+          /utils/exec={
+            % Create the ioid's \pic without drawing it, to get the list
+            % of eiids (placed in \lit@eiids).
+            \begingroup
+              \pgfpositionnodelater{\empty} % When a node is created, it is not
+                                            % inserted into the current picture.
+                                            % see 101.2.3 Deferred Node Positioning
+              \pic {#1-eiids};
+            \endgroup
+          },
+          /litmus/assem #1/eiids/.initial/.expand once=\lit@eiids,
+        },
+      },
+    },
+  },
+  compute assem text width/.value required,
+  compute assem text width/.style={
+    % #1: some unique identifier; Used internally to store the widths.
+    %     The pgf math function 'computedwidthof("#1")' expands to the
+    %     computed widths of this diagram.
+    /utils/ifboolexpe={test {\ifcsdef{#1@litmusinstructionswidths@uid}}} then {
+      /utils/package warning={litmus-tikz-library}{'compute assem text width' expects a unique identifier, '#1' was already used.},
+    } else {
+      /utils/exec={\csgdef{#1@litmusinstructionswidths@uid}{true}},
+      /pgf/declare function={
+        computedwidth()=computedwidthof("#1");
+      },
+      /utils/ifboolexpe={test {\ifcsdef{#1@litmusinstructionswidths}}} then {
+        % Width has been previously computed, saved to the .aux file and
+        % loaded. Set 'text width' if it has not been set manually.
+        /utils/exec={\lit@auxout@comtextwidth{#1}{\csuse{#1@litmusinstructionswidths}}},
+        /litmus/computed text width/.style={
+          /utils/ifboolexpe={test {\ifdefempty{\tikz@text@width}}} then {
+            /tikz/text width=computedwidth,
+          },
+        },
+      } else {
+        % Width has not been computed in a previous run, compute it now
+        % and save to the .aux file
+        %%% NOTE: ^^J is a line-break, litmus.mk is looking for '^run latex again.'
+        /utils/package warning={litmus-tikz-library}{Computing width of assem (#1),^^Jrun latex again.},
+        /litmus/computed text width/.style={
+          /tikz/text width=,
+          /tikz/minimum size=0,
+          /tikz/inner sep=0,
+          /tikz/outer sep=0,
+          /tikz/draw=none,
+        },
+        /tikz/execute at end scope={
+          \def\lit@temp@widths{\@gobble}
+          \tikzmath{
+            int \t;
+            coordinate \d;
+            for \t in {1,...,int(\chaincount{threads})}{
+              \d = (threads-\t.east)-(threads-\t.west);
+              print{\xdef\lit@temp@widths{\lit@temp@widths,\dx}};
+            };
+          }
+          \lit@auxout@comtextwidth{#1}{\lit@temp@widths}
+        },
+      },
+    },
+  },
+  assem internal/.style={
+    % #1 - ioid
+    /tikz/name=assem #1,
+    /litmus/ioid={#1},
+    /litmus/hide line=false,
+    /tikz/anchor=base west,
+    % This makes assem rows consistent (i.e. rows of different threads align with each other)
+    /tikz/text depth=\assemdepth,
+    /tikz/text height=\assemrowsep - \assemdepth,
+    /litmus/.cd scope={
+      every assem/.try={\lit@code@label}{#1},
+      assem #1/.try={\lit@code@label}{#1},
+    },
+    % 'execute at begin/end node' are accumelating so these have to be
+    % after the user styles so the user's code is in the real begining
+    % and user's end is before the eiids comment.
+    /tikz/execute at begin node={
+      \litmusset{inline code label/.selected/.expanded={\lit@code@label}{#1}}
+    },
+    /tikz/execute at end node={
+      \litmusset{show eiids comment/.selected={#1}}
+    },
+    /litmus/computed text width/.try,
+  },
+  % 0-0 is a dummy ioid for hand written tests
+  assem/.default=0-0,
+  assem/.style={
+    % #1 - ioid
+    /litmus/collect eiids={#1},
+    /litmus/assem internal={#1},
+    % We always draw the edges, even when the events are not drawn,
+    % hence, we add aliases to the assem so it can take the events place.
+    /litmus/is events litmus/.if false=then {
+      /litmus/assem #1/eiids/.if defined value={\lit@eiids@temp} then {
+        /tikz/alias={#1},
+        /tikz/alias/.list/.expand once=\lit@eiids@temp,
+      },
+    },
+    /tikz/execute at end node={\gdef\lit@code@label{}},
+  },
+}
+
+\litmusset{
+  code label/.code 2 args={%
+    % #1 - location label
+    % #2 - ioid
+    \ifstrempty{#1}{}{% else
+      {\color{code label color}\lit@internal@assem{#1:}}%
+    }%
+  },
+  inline code label/.initial=none,
+  inline code label/inline/.style 2 args={/litmus/.cd scope={code label={#1}{#2}}},
+  inline code label/left/.code 2 args={\llap{\litmusset{code label={#1}{#2}}}},
+  inline code label/none/.style 2 args=,
+  code label position/.is choice,
+  code label position/above/.style={
+    /litmus/assem label/.style={
+      /litmus/the code label={##1},
+      /tikz/node contents={%
+        \litmusset{code label/.expanded={\lit@code@label}{\lit@tid-##1}}%
+      },
+      /litmus/assem internal/.expanded={\lit@tid-##1},
+      /litmus/.cd scope={
+        every assem label/.try,
+      },
+    },
+    /litmus/inline code label=none,
+  },
+  code label position/inline/.style={
+    /litmus/assem label/.style={
+      /litmus/the code label={##1},
+      /tikz/node contents=,
+      /litmus/hide,
+      /litmus/hide line,
+    },
+    /litmus/inline code label=inline,
+  },
+  code label position/left/.style={
+    /litmus/assem label/.style={
+      /litmus/the code label={##1},
+      /tikz/node contents=,
+      /litmus/hide,
+      /litmus/hide line,
+    },
+    /litmus/inline code label=left,
+  },
+  code label position/none/.style={
+    /litmus/assem label/.style={
+      /litmus/ioid={##1},
+      /litmus/the code label={##1},
+      /tikz/node contents=,
+      /litmus/hide,
+      /litmus/hide line,
+    },
+    /litmus/inline code label=none,
+  },
+  code label position=above,
+  eiids comment/.code={%
+    \hfill{\color{red!60}\lit@internal@assem{//#1}}%
+  },
+  show eiids comment/.initial={\iflit@events false\else true\fi},
+  show eiids comment/.default=true,
+  show eiids comment/true/.style={
+    /litmus/assem #1/eiids/.if defined value={\lit@eiids@temp} then {
+      /litmus/.cd scope={
+        eiids comment #1/.try/.expanded=\lit@eiids@temp,
+        eiids comment/.retry/.expanded=\lit@eiids@temp,
+      },
+    },
+  },
+  show eiids comment/false/.style={},
+}
+
+\pgfkeys{
+  /handlers/.mem read/.style={
+    \pgfkeyscurrentpath/.get key parts=\lit@key,
+    /litmus/\lit@keyname/.style/.expanded={/litmus/mem event={\lit@keyname:#1}},
+    /litmus/eiids order/.list append/.expand once=\lit@keyname,
+  },
+  /handlers/.mem write/.style={
+    \pgfkeyscurrentpath/.get key parts=\lit@key,
+    /litmus/\lit@keyname/.style/.expanded={/litmus/mem event={\lit@keyname:#1}},
+    /litmus/eiids order/.list append/.expand once=\lit@keyname,
+  },
+  /handlers/.events/.style={
+    \pgfkeyscurrentpath/.get key parts=\lit@key,
+    /tikz/\lit@keyname/.pic/.expanded={
+      \noexpand\path[pic actions]
+        { [ /litmus/eiids order/.initial=,
+            /litmus/#1,
+            /litmus/events={\lit@keyname},
+            /litmus/eiids order/.get=\noexpand\lit@temp@eiids,
+            /litmus/event nodes/.initial=,
+            /litmus/add event node/.style={/litmus/event nodes/.append={node[/litmus/########1]}},
+            /litmus/add event node/.list/.expanded=\noexpand\lit@temp@eiids,
+          ]
+          \noexpand\pgfkeysvalueof{/litmus/event nodes}
+        }
+        node[/litmus/events box={\lit@keyname}] (\lit@keyname) {};
+    },
+    % The following .pic is used when we collect the eiids, it is not
+    % used to draw anything.
+    /tikz/\lit@keyname-eiids/.pic/.expanded={
+      \noexpand\path
+        { [ /litmus/eiids order/.initial=,
+            /litmus/#1,
+            /litmus/events={\lit@keyname},
+            /litmus/eiids order/.get=\noexpand\lit@temp@eiids,
+            /utils/exec={\noexpand\xdef\noexpand\lit@eiids{\noexpand\lit@temp@eiids}},
+          ]
+        } ;
+    },
+  },
+}
+
+\litmusset{
+  events/.value required, % ioid
+  events/.style={
+    /tikz/local bounding box=lbbox,
+    /tikz/node distance=1pt,
+    /tikz/start chain=events going {/tikz/below=of \tikzchainprevious.south west, /tikz/anchor=north west},
+    /litmus/event/.append style={/tikz/on chain=events},
+    /litmus/.cd scope={
+      every events/.try={#1},
+      events #1/.try
+    },
+  },
+  events box internal/.style={/tikz/inner sep=0},
+  events box/.value required, % ioid
+  events box/.style={
+    /utils/exec={%
+      \csxdef{lit@#1@tid}{\lit@tid}%
+      \csxdef{lit@#1@row}{\the\pgfmatrixcurrentrow}%
+    },
+    /tikz/behind path,
+    /tikz/fit=(lbbox),
+    /litmus/events box internal,
+    /litmus/.cd scope={
+      every events box/.try={#1},
+      events box #1/.try,
+    },
+  },
+  show event label/.is flag=true,
+  event label/.code={{\color{black}#1:}},
+  event/.value required,% eiid
+  event/.style={
+    % 'on chain=events' is added by 'events' so that 'event' can also
+    % be used not on the chain (e.g. hand written diagrams).
+    /tikz/name={#1-text},
+    /utils/exec={%
+      \csxdef{lit@#1@tid}{\lit@tid}%
+      \csxdef{lit@#1@row}{\the\pgfmatrixcurrentrow}%
+    },
+    /tikz/node font=\sffamily,
+    % If the heights of the first event in each thread do not match the
+    % thread headers will not be aligned.
+    /tikz/text height={height("abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUVWXYZ 0123456789 =:/[]")},
+    /litmus/.cd scope={
+      every event/.try={#1},
+      event #1/.try,
+    },
+    /litmus/show event label/.if true=then {
+      /tikz/append after command={
+        node[%
+          anchor=base east,
+          align=right,
+          /litmus/.cd scope={
+            every event label/.try={#1},
+            event label #1/.try,
+          },
+        ] (#1-label) at (#1-text.base west) {\litmusset{event #1/eiid/.get with default={\lit@eiid}{#1}, event label/.expand once=\lit@eiid}}
+        node[%
+          fit={(#1-label)(#1-text)},
+          inner sep=0pt,
+          /litmus/.cd scope={
+            every event box/.try={#1},
+            event box #1/.try,
+          },
+        ] (#1) {}
+      },
+    } else {
+      /tikz/append after command={
+        node[%
+          fit={(#1-text)},
+          inner sep=0pt,
+          /litmus/.cd scope={
+            every event box/.try={#1},
+            event box #1/.try,
+          },
+        ] (#1) {}
+      },
+    },
+  },
+  event/.prefix style={/tikz/anchor=base west},
+      % this has to be prefixed so that the 'anchor' of 'going' can
+      % take precedence (for all nodes except the first one on the chain)
+  init/.style={
+    /tikz/name=init-#1,
+    /tikz/circle,
+    /tikz/minimum size=0.75ex,
+    /tikz/inner sep=0,
+    /tikz/draw=rf color,
+    /tikz/fill=rf color,
+    /tikz/node distance=0.75em,
+    /tikz/above left=of #1,
+    /litmus/.cd scope={
+      every init/.try={#1},
+      event init-#1/.try,
+    },
+  },
+}
+
+\litmusset{
+  init right/.style={
+    /litmus/event init-#1/.append style={/tikz/xshift=0.75em, /tikz/right=of #1},
+    /litmus/(init-#1) rf (#1)/.append style=/tikz/swap,
+  },
+  init left/.style={
+    /litmus/event init-#1/.append style={/tikz/xshift=-0.75em, /tikz/left=of #1},
+  },
+  init above right/.style={
+    /litmus/event init-#1/.append style={/tikz/above right=of #1},
+    /litmus/(init-#1) rf (#1)/.append style=/tikz/swap,
+  },
+  init below right/.style={
+    /litmus/event init-#1/.append style={/tikz/below /tikz/right=of #1},
+    /litmus/(init-#1) rf (#1)/.append style=/tikz/swap,
+  },
+  init above left/.style={
+    /litmus/event init-#1/.append style={/tikz/above left=of #1},
+  },
+  init below left/.style={
+    /litmus/event init-#1/.append style={/tikz/below left=of #1},
+    /litmus/(init-#1) rf (#1)/.append style=/tikz/swap,
+  },
+}
+
+\pgfkeys{
+  /litmus/add check exists/.code args={event #1}{%
+    \listgadd{\lit@check@exists@list}{#1}%
+  },
+  /handlers/.change eiid/.style args={to #1}{
+    \pgfkeyscurrentpath/.get key parts=\change@temp,
+    \change@temp/eiid/.initial={#1},
+    /litmus/add check exists/.expand once=\change@tempname,
+  },
+  /handlers/.change value/.style args={from #1 to #2}{
+    \pgfkeyscurrentpath/.get key parts=\change@temp,
+    \change@temp/value/.initial={#2},
+    \change@temp/value-expected/.initial={#1},
+    /litmus/add check exists/.expand once=\change@tempname,
+  },
+  /handlers/.change addr/.style args={from #1 to #2}{
+    \pgfkeyscurrentpath/.get key parts=\change@temp,
+    \change@temp/fp addr/.initial={#2},
+    \change@temp/fp addr-expected/.initial={#1},
+    /litmus/add check exists/.expand once=\change@tempname,
+  },
+  /handlers/.change offset/.style args={from #1 to #2}{
+    \pgfkeyscurrentpath/.get key parts=\change@temp,
+    \change@temp/fp offset/.initial={#2},
+    \change@temp/fp offset-expected/.initial={#1},
+    /litmus/add check exists/.expand once=\change@tempname,
+  },
+  /handlers/.change size/.style args={from #1 to #2}{
+    \pgfkeyscurrentpath/.get key parts=\change@temp,
+    \change@temp/fp size/.initial={#2},
+    \change@temp/fp size-expected/.initial={#1},
+    /litmus/add check exists/.expand once=\change@tempname,
+  },
+  /handlers/.change footprint/.style args={from #1+#2/#3 to #4+#5/#6}{
+    \pgfkeyscurrentpath/.get key parts=\change@temp,
+    \change@temp/.change addr=from #1 to #4,
+    \change@temp/.change offset=from #2 to #5,
+    \change@temp/.change size=from #3 to #6,
+  },
+  /handlers/.change mem access/.style args={from #1+#2/#3=#4 to #5+#6/#7=#8}{
+    \pgfkeyscurrentpath/.get key parts=\change@temp,
+    \change@temp/.change addr=from #1 to #5,
+    \change@temp/.change offset=from #2 to #6,
+    \change@temp/.change size=from #3 to #7,
+    \change@temp/.change value=from #4 to #8,
+  },
+}
+
+\litmusset{
+  record exists/.code={\listgadd{\lit@exists@list}{#1}},
+  check value/.code 2 args={
+    \edef\lit@temp@exval{\pgfkeysifdefined{/litmus/#1-expected}{\pgfkeysvalueof{/litmus/#1-expected}}{#2}}
+    \edef\lit@temp@val{#2}
+    \ifx\lit@temp@exval\lit@temp@val\else
+      \PackageError{litmus-tikz-library}{'#1' does not match the expected value (\lit@temp@exval\space <> \lit@temp@val)}{}
+    \fi
+  },
+  mem event/.style args={#1:#2 #3+#4/#5=#6}{
+    % <eiid>:<mem_access> <mem-loc>+<offset>/<size>=<value>
+    % e.g. 'a:W x+0/4=1'
+    %      'a:Racq x+4/2=5'
+    /litmus/record exists={#1},
+    /litmus/check value={/litmus/event #1/fp addr}{#3},
+    /litmus/check value={/litmus/event #1/fp offset}{#4},
+    /litmus/check value={/litmus/event #1/fp size}{#5},
+    /litmus/check value={/litmus/event #1/value}{#6},
+    /litmus/event={#1},
+    /litmus/event #1/fp addr/.get with default={\lit@addr}{#3},
+    /litmus/event #1/fp offset/.get with default={\lit@offs}{#4},
+    /litmus/event #1/fp size/.get with default={\lit@size}{#5},
+    /litmus/event #1/value/.get with default={\lit@val}{#6},
+    /tikz/node contents={%
+      \litmusset{mem access/#2/.try, mem access/.retry={#2}}\,\litmusset{memfp/.expanded={\lit@addr}{\lit@offs}{\lit@size}}=\lit@val%
+    },
+  },
+  mem access/.code={#1},
+}
+
+\litmusset{
+  boxed events/.default=black!10,
+  boxed events/.style={
+    /litmus/events box internal/.append style={
+      /tikz/rounded corners=2pt,
+      /tikz/inner sep=2pt,
+      /tikz/fill=#1,
+    },
+  },
+}
+
+\newif\iflit@set@vertical@align@to\lit@set@vertical@align@tofalse
+\litmusset{
+  horizontal align/.style={
+    /tikz/to path={
+      (\tikztostart) -- (\tikztotarget |- \tikztostart) \tikztonodes
+    },
+  },
+  set vertical align to/.is global if flag=lit@set@vertical@align@to,
+  vertical align to node/.global store in=\lit@vertical@align@to,
+  vertical align to/.style={
+    /litmus/set vertical align to/.if true=then {
+      /litmus/vertical align to node={#1},
+      /litmus/set vertical align to=false,
+    },
+  },
+  % after this style is applied all the edges in scope will be vertically
+  % aligned with #1 (default: the first node)
+  vertical align/.default=\tikztostart,
+  vertical align/.style={
+    % HACK: clear 'edge distance {0,1}' to locally disable this routing
+    /litmus/edge distance {0,1}/.style=,
+    /litmus/set vertical align to=true,
+    /tikz/to path={
+      [/litmus/vertical align to/.expanded={#1}]
+      (\tikztostart.south -| \lit@vertical@align@to) -- (\tikztotarget.north -| \lit@vertical@align@to) \tikztonodes
+    },
+  },
+  instruction relations/.style={
+    /litmus/vertical align,
+    /litmus/.cd scope={
+      every instruction relations/.try,
+    },
+    /tikz/execute at end scope/.value of=/litmus/add to instruction relations \lit@tid,
+  },
+  /handlers/.add instructions edge/.style={
+    \pgfkeyscurrentpath/.get key parts=\lit@key,
+    /litmus/add instructions edge/.expand once={\lit@keyname={#1}},
+  },
+  add instructions edge/.style args={(#1-#2) #3 (#4)=#5}{
+    (#1-#2) #3 (#4)/.append style={#5},
+    /litmus/add to instruction relations #1/.append={%
+      \path (#1-#2) edge[/litmus/.cd scope={#3,#5}] (#4);%
+    },
+  },
+  event relations/.style={
+    /litmus/.cd scope={
+      every event relations/.try,
+    },
+    /tikz/execute at end scope/.value of=/litmus/add to event relations,
+  },
+  /handlers/.add events edge/.style={
+    \pgfkeyscurrentpath/.get key parts=\lit@key,
+    /litmus/add events edge/.expand once={\lit@keyname={#1}},
+  },
+  add events edge/.style args={(#1) #2 (#3)=#4}{
+    (#1) #2 (#3)/.append style={#4},
+    /litmus/add to event relations/.append={%
+      \ifboolexpr{%
+        test {\lit@if@init@event{#1}} and%
+        not test {\lit@ifnodeexists{#1}}%
+      }{% then
+        \path node[gobble init/.style args={init-##1}{/litmus/init=##1},gobble init=#1] {} edge[/litmus/.cd scope={#2,#4}] (#3);%
+      }{% else
+          \path (#1) edge[/litmus/.cd scope={#2,#4}] (#3);%
+      }%
+    },
+  },
+}
+
+\def\lit@if@init@event#1{\@lit@if@init@event#1-\par}
+\def\@lit@if@init@event#1-#2\par{\ifstrequal{init}{#1}{\@firstoftwo}{\@secondoftwo}}
+
+\litmusset{
+  label pos/.initial=0.5,
+  label text/.initial=\empty,
+  relation/.style={
+    /tikz/arrows=->,
+    /tikz/thick,
+    /tikz/edge node={
+      node[
+        auto,
+        font=\sffamily,
+        inner sep=1pt,
+        /litmus/.cd scope={
+          every label/.try,
+          every #1 label/.try,
+        },
+        pos/.value of=/litmus/label pos,
+        node contents/.value of=/litmus/label text,
+      ]
+    },
+    /litmus/.cd scope={
+      every relation/.try,
+    },
+  },
+  hide/.style={
+    /tikz/overlay, /tikz/to path=, /tikz/opacity=0, /tikz/text opacity=0,
+    /tikz/fill opacity=0, /tikz/text height=0, /tikz/text depth=0,
+    /tikz/text width=0, /tikz/inner sep=0, /tikz/outer sep=0,
+    /tikz/minimum size=0,
+  }, % 'to path=' affects 'vertical align' (the first node changes)
+  hide edge/.style={/litmus/hide #1},
+  hide edges/.style={/litmus/hide edge/.list={#1}},
+}
+
+\litmusset{%
+  enable edge routing/.style={
+    /litmus/edge routing/.style={
+      /utils/ifboolexpe={%
+        test {\ifcsdef{lit@\tikztotarget @tid}}%
+        and test {\ifcsdef{lit@\tikztostart @tid}}%
+        and test {\ifcsdef{lit@\tikztotarget @row}}%
+        and test {\ifcsdef{lit@\tikztostart @row}}%
+      } then {
+        /tikz/evaluate={
+          int \x,\y;
+          \x = int(\csuse{lit@\tikztotarget @tid}) - int(\csuse{lit@\tikztostart @tid});
+          \y = int(\csuse{lit@\tikztotarget @row}) - int(\csuse{lit@\tikztostart @row});
+        },
+        /litmus/edge distance {\x,\y}/.try,
+      },
+    },
+  },
+  disable edge routing/.style={
+    /litmus/edge routing/.style=,
+  },
+  /litmus/edge routing/filter/.is family,
+  /litmus/edge routing/.belongs to family=/litmus/edge routing/filter,
+  /litmus/disable edge routing/.belongs to family=/litmus/edge routing/filter,
+  /litmus/enable edge routing/.belongs to family=/litmus/edge routing/filter,
+  /litmus/apply edge routing filter to/.code={%
+    \pgfkeys{/pgf/key filters/active families/.install key filter}%
+    \pgfqkeysactivatesinglefamilyandfilteroptions{/litmus/edge routing/filter}{/litmus}{#1}%
+  },
+  /handlers/.disable routing/.style={
+    \pgfkeyscurrentpath/disable routing/.style={},
+  },
+  % Back edges:
+  edge distance {-3,-1}/.style={/tikz/out=-160, /tikz/in=-55, /tikz/looseness=0.8, /litmus/label pos=0.9},
+  edge distance {-2,-1}/.style={/tikz/out=-160, /tikz/in=-55, /litmus/label pos=0.8},
+  edge distance {-1,-4}/.style={/tikz/out=-190, /tikz/in=-145, /tikz/looseness=1},
+  edge distance {-1,-3}/.style={/tikz/out=-185, /tikz/in=-145, /tikz/looseness=1.2},
+  edge distance {-1,-2}/.style={/tikz/out=-180, /tikz/in=-145, /tikz/looseness=1.5},
+  edge distance {-1,-1}/.style={/tikz/out=-160, /tikz/in=-145, /tikz/looseness=2.1, /litmus/label pos=0.8},
+  edge distance {0,-1}/.style={/tikz/bend left=60},
+  % Loop or events from the same instruction:
+  edge distance {0,0}/.style={/tikz/out=180, /tikz/in=180, /tikz/distance=1.5em, /tikz/swap},
+  % Immediate successor: for such edges between ioids the 'vertical align'
+  % overrides this routing; when such edge exists between eiids you probably
+  % want to add 'hide po', '(<eiid1>) <edge> (<eiid2)/.disable routing'
+  % and '(<eiid1>) <edge> (<eiid2)/.style={vertical align=<ioid>}' to the
+  % litmus diagram.
+  edge distance {0,1}/.style={/tikz/bend left=60},
+  % Skip (forward) edges:
+  edge distance {0,2}/.style={/tikz/bend left=60},
+  edge distance {0,3}/.style={/tikz/bend left=60},
+  edge distance {0,4}/.style={/tikz/bend left=55},
+  edge distance {0,5}/.style={/tikz/bend left=55},
+  % Strait horizontal line:
+  edge distance {1,0}/.style={
+    /tikz/to path={(\tikztostart.east) -- (\tikztotarget.west |- \tikztostart.east) \tikztonodes},
+  },
+}
+
+% define basic colors
+\definecolor{litmusBlack}     {rgb}{0,0,0}             % svgname Black
+\definecolor{litmusBrown}     {rgb}{0.647,0.165,0.165} % svgname Brown
+\definecolor{litmusRed}       {rgb}{1,0,0}             % svgname Red
+\definecolor{litmusOrange}    {rgb}{1,0.648,0}         % svgname Orange
+\definecolor{litmusIndigo}    {rgb}{0.294,0.000,0.510} % svgname Indigo
+\definecolor{litmusDarkGreen} {rgb}{0.000,0.392,0.000} % svgname DarkGreen
+
+\litmusset{
+  /handlers/.litmus relation/.style={
+    \pgfkeyscurrentpath/.get key parts=\@lit@key,
+    /utils/exec={\expandafter\colorlet\expandafter{\@lit@keyname\space color}{#1}},
+    \@lit@key/.default/.expand once=\@lit@keyname,
+    \@lit@key/.estyle={
+      /litmus/relation={\@lit@keyname},
+      /litmus/label text={##1},
+      /tikz/color={\@lit@keyname\space color},
+      % We run the user defined styles with a special filter that only
+      % allowes the '/litmus/{disable|enable} edge routing' keys to be
+      % executed, as these keys have to be executed before we do the
+      % edge routing and the other keys must be executed after
+      /litmus/every \@lit@keyname/.belongs to family=/litmus/edge routing/filter,
+      /litmus/(\noexpand\tikztostart) \@lit@keyname\space (\noexpand\tikztotarget)/.belongs to family=/litmus/edge routing/filter,
+      /litmus/apply edge routing filter to={
+        every \@lit@keyname/.try,
+        (\noexpand\tikztostart) \@lit@keyname\space (\noexpand\tikztotarget)/.try,
+      },
+      % Try all the 'disable routing' options and if none of them work do the routing.
+      /litmus/(\noexpand\tikztostart) \@lit@keyname\space (\noexpand\tikztotarget)/disable routing/.try,
+      /litmus/(\noexpand\tikztostart)/disable routing/.retry,
+      /litmus/(\noexpand\tikztotarget)/disable routing/.retry,
+      /litmus/from (\noexpand\tikztostart)/disable routing/.retry,
+      /litmus/to (\noexpand\tikztotarget)/disable routing/.retry,
+      /litmus/\@lit@keyname/disable routing/.retry,
+      /litmus/edge routing/.retry,
+      %
+      /litmus/.cd scope={
+        every \@lit@keyname/.try,
+        (\noexpand\tikztostart) \@lit@keyname\space (\noexpand\tikztotarget)/.try,
+      },
+    },
+    /litmus/hide \@lit@keyname/.estyle={\@lit@key/.style={/litmus/hide}},
+    % Add an inverse edge (not a real edge, just a wrapper that adds
+    % \textsuperscript{-1} to the default label)
+    \@lit@key^{-1}/.default/.expanded={\expandonce\@lit@keyname\noexpand\textsuperscript{-1}},
+    \@lit@key^{-1}/.estyle={\@lit@key={##1}},
+  },
+  base language/.style={
+    % Generated in pp.ml (pp_brief_write_kind):
+    /litmus/mem access/W/.code={W},
+    % Generated in pp.ml (pp_brief_read_kind):
+    /litmus/mem access/R/.code={R},
+    /litmus/po/.litmus relation=litmusBlack,
+    /litmus/co/.litmus relation=litmusBrown,
+    /litmus/rf/.litmus relation=litmusRed,
+      /litmus/hide rf/.append style={/litmus/init/.style=/litmus/hide},
+      /litmus/rf'/.style 2 args={/litmus/rf={\litmusset{memrf={##1}{##2}}}},
+    /litmus/fr/.litmus relation=litmusOrange,
+    /litmus/ctrl/.litmus relation=litmusIndigo,
+    /litmus/ctrl+addr/.litmus relation=litmusIndigo,
+    /litmus/addr/.litmus relation=litmusIndigo,
+    /litmus/data/.litmus relation=litmusIndigo,
+    % Edge with multiple labels
+    /litmus/multi/.litmus relation=litmusBlack,
+    /litmus/append multi label/.code={%
+      \pgfkeysgetvalue{/litmus/##1/.@def}{\lit@temp@label@}%
+      % Handle inverse edges like 'po^{-1}' (we only look for the ^)
+      \def\lit@temp@p####1^####2\lit@term{####1}%
+      \edef\lit@temp@label{\expandonce\lit@temp@label,{\noexpand\color{\lit@temp@p##1^\lit@term\space color}\expandonce\lit@temp@label@}}%
+    },
+    /litmus/multi'/.style={
+      /utils/exec={\def\lit@temp@label{\@gobble}},
+      /litmus/append multi label/.list={##1},
+      /litmus/multi/.expand once=\lit@temp@label,
+    },
+    %
+    /litmus/.cd scope={
+      every litmus base language/.try,
+    },
+  },
+}
+
+\input{tikzlibrarylitmus.aarch64}
+\input{tikzlibrarylitmus.power}
+\input{tikzlibrarylitmus.riscv}
+\input{tikzlibrarylitmus.x86}
+
+\litmusset{
+  state prefix font/.initial=,
+  initial state prefix/.initial={Initial state:~},
+  final state prefix/.initial={Final state:~},
+  final state result/.initial=unknown,
+  final state result/unknown/.style={/litmus/.cd scope={every final state unknown/.try}},
+  final state result/allowed/.style={/litmus/.cd scope={every final state allowed/.try}},
+  final state result/forbidden/.style={/litmus/.cd scope={every final state forbidden/.try}},
+  final state allowed/.style={
+    /litmus/final state result=allowed,
+    /litmus/final state prefix={Allowed:~},
+    /utils/if no value={#1} then {} else {
+      /litmus/final state={#1},
+    },
+    /litmus/expected observations=allowed,
+  },
+  final state forbidden/.style={%
+    /litmus/final state result=forbidden,
+    /litmus/final state prefix={Forbidden:~},
+    /utils/if no value={#1} then {} else {
+      /litmus/final state={#1},
+    },
+    /litmus/expected observations=forbidden,
+  },
+  %
+  table header/.code={
+    \node[
+      name=table header,
+      node distance=0,
+      inner sep=0,
+      outer sep=0,
+      align=left,
+      text width=\lit@threads@width - (2*\pgfkeysvalueof{/pgf/inner xsep}) + \pgflinewidth,
+      /litmus/litmus name/.get=\lit@name,
+      /litmus/architecture/.get=\lit@arch,
+      node contents={\rlap\lit@name\hfill\llap\lit@arch},
+      /litmus/.cd scope={
+        every table header/.try,
+      },
+      #1, % Should be positioning
+    ];
+  },
+  initial state box/.code={
+    \node[
+      name=initial state box,
+      outer sep=0,
+      node distance=0,
+      node contents={{\pgfkeysvalueof{/litmus/state prefix font}\pgfkeysvalueof{/litmus/initial state prefix}}\pgfkeysvalueof{/litmus/initial state}},
+      text width=\lit@threads@width - (2*\pgfkeysvalueof{/pgf/inner xsep}),
+      draw,
+      /litmus/.cd scope={
+        every box/.try,
+        every state/.try,
+        every initial state/.try,
+      },
+      #1, % Should be positioning
+    ];
+  },
+  final state box/.code={
+    \node[
+      name=final state box,
+      outer sep=0,
+      node distance=0,
+      node contents={{\pgfkeysvalueof{/litmus/state prefix font}\pgfkeysvalueof{/litmus/final state prefix}}\pgfkeysvalueof{/litmus/final state}},
+      text width=\lit@threads@width - (2*\pgfkeysvalueof{/pgf/inner xsep}),
+      draw,
+      /litmus/.cd scope={
+        every box/.try,
+        every state/.try,
+        every final state/.try,
+      },
+      /litmus/final state result/.selected,
+      #1, % Should be positioning
+    ];
+  },
+%   \TODO{change obs to Y,N and - in san serif, try \footnote, add colors to match the tables}
+  expected observations/.initial=unknown,
+  expected observations/allowed/.style={/litmus/.cd scope={expected observations allowed/.try}},
+  expected observations/forbidden/.style={/litmus/.cd scope={expected observations forbidden/.try}},
+  experimental result/.is choice,
+  experimental result/observed/.style={
+    /tikz/node contents=Y,
+    /litmus/.cd scope={
+      experimental result/every observed/.try,
+    },
+  },
+  experimental result/not observed/.style={
+    /tikz/node contents=N,
+    /litmus/.cd scope={
+      experimental result/every not observed/.try,
+    },
+  },
+  experimental result/missing/.style={
+    /tikz/node contents={--},
+    /litmus/.cd scope={
+      experimental result/every missing/.try,
+    },
+  },
+  hw observations box/.code={
+    \begin{scope}[%
+      /litmus/hw observations/.get=\lit@obs,
+      start chain=observations going right,
+      node distance=1pt,
+      /litmus/expected observations/.selected,
+    ]
+      \node[
+        name=hw observations prefix,
+        outer sep=0,
+        node distance=0,
+        node contents={HW observations:},
+        on chain,
+        /litmus/.cd scope={
+          every hw observations prefix/.try,
+        },
+        #1, % Should be positioning
+      ];
+      \foreach \o/\r in \lit@obs
+        \node[
+%           anchor=base west,
+%           at={(hw observations prefix.base east)},
+          on chain,
+          minimum size=0, inner sep=0, outer sep=0,
+          node contents=,
+          /litmus/.cd scope={
+            every hw observation/.try,
+          },
+          /utils/ifboolexpr={test {\ifdefstring{\r}{0}}} then {
+            /litmus/experimental result=missing,
+          } else {
+            /utils/ifboolexpr={test {\ifdefstring{\o}{0}}} then {
+              /litmus/experimental result=not observed,
+            } else {
+              /litmus/experimental result=observed,
+            },
+          },
+%           /litmus/experimental result/.expand once=\s,
+        ];
+    \end{scope}
+  },
+  table construction/.style={
+    /litmus/table header={/tikz/above=1pt of threads box, /tikz/anchor=base},
+    /litmus/initial state box={/tikz/below=2pt of threads box},
+    /litmus/final state box={/tikz/below=of initial state box},
+    /litmus/hw observations box={/tikz/anchor=north west,/tikz/at=(final state box.south west)},
+  },
+  read states file/.code={%
+    \begingroup%
+      \InputIfFileExists{#1.states.tex}{}{%
+        \def\litmusname{??}%
+        \def\litmusarch{??}%
+        \def\rmemmodel{??}%
+        \def\initstate{??}%
+        \def\finalstate{??}%
+      }%
+      \InputIfFileExists{#1.hw.tex}{}{%
+        \def\litmusobservations{}%
+      }%
+      \edef\lit@temp{%
+    \endgroup%
+        \noexpand\pgfkeysalso{%
+          /litmus/litmus name/.initial={\litmusname},%
+          /litmus/architecture/.initial={\litmusarch},%
+          /litmus/rmem model/.initial={\rmemmodel},%
+          /litmus/initial state/.initial={\initstate},%
+          /litmus/final state/.initial={\finalstate},%
+          /litmus/hw observations/.initial={\litmusobservations},%
+        }%
+      }\lit@temp%
+    \pgfkeysalso{%
+      % In most case, the relaxed model indicates the test is forbidden
+      % and any other model indicates the test is allowed:
+      /litmus/rmem model/.try selected,%
+      /litmus/final state allowed/.retry,%
+    }%
+  },
+}
+\litmusset{
+  litmus table/.style n args={4}{
+    /litmus/litmus name/.initial={#1},
+    /litmus/architecture/.initial={#2},
+%     /litmus/rmem model/.initial={#??},
+    /litmus/initial state/.initial={#3},
+    /litmus/final state/.initial={#4},
+    /litmus/@litmus table,
+    /litmus/hw observations/.initial=,
+  },
+  @litmus table/.style={
+    /tikz/execute at end scope={
+      \begin{scope}[/litmus/.cd scope={every table scope/.try}]
+        \begin{scope}[on background layer]
+          % Fit a node for each assembly line (behind the borders)
+          \tikzmath{
+            coordinate \@topleft,\@botright;
+            \@topleft = (threads-1.north west);
+            \@botright = (threads-\chaincount{threads}.north east) - (0pt,\assemrowsep);
+            int \@l;
+            for \@l in {1,...,\maxassemlines}{
+              {%
+                \node[%
+                  inner sep=0, minimum size=0,
+                  yshift=-(\@l - 1) * (\assemrowsep),
+                  fit=(\@topleft) (\@botright),
+                  node contents=,
+                  /litmus/.cd scope={
+                    every code line/.try/.expand once=\@l,
+                    evaluate={\lit@line@parity = isodd(\@l) ? "odd" : "even";},
+                    every \lit@line@parity\space code line/.try/.expand once=\@l,
+                    every code line \@l/.try,
+                  },
+                ];
+              };
+            };
+          }
+          % This node fits around all the assembly and thread headers
+          \node[
+            inner sep=0, outer sep=0,
+            /utils/exec={\def\lit@temp@nodes{}},
+            evaluate={
+              int \c,\t,\tid;
+              \c = int(\chaincount{threads});
+              for \t in {1,...,\c}{
+                \tid = \t - 1;
+                print{%
+                  \lit@ifnodeexists{thread \tid\space header}{% then
+                    \xdef\lit@temp@nodes{\lit@temp@nodes (threads-\t) (thread \tid\space header)}%
+                  }{% else
+                    \xdef\lit@temp@nodes{\lit@temp@nodes (threads-\t)};
+                  }%
+                };%
+              };
+            },
+            fit/.expand once=\lit@temp@nodes,
+            draw,
+            /litmus/.cd scope={
+              every box/.try,
+              every threads box/.try,
+            },
+          ] (threads box) {};
+          % Draw lines between threads
+          \tikzmath{
+            int \c,\t;
+            \c = int(\chaincount{threads});
+            if \c > 1 then {
+              for \t in {2,...,\c}{
+                % do not remove the "extra" brackets (see \tikzmath 'print')
+                {\path[draw, /litmus/.cd scope={every border between threads/.try}] (threads box.north -| threads-\t.west) -- (threads box.south -| threads-\t.west);};
+              };
+            };
+          }
+          % Draw a line between thread headers and assembly
+          \path[draw, /litmus/.cd scope={every thread headers border/.try}]
+            (threads box.west |- threads-1.north) -- (threads box.east |- threads-1.north);
+        \end{scope}
+        \tikzmath{
+          coordinate \diff;
+          \diff = (threads box.north east) - (threads box.south west);
+          let \lit@threads@width = \diffx;
+          let \lit@threads@height = \diffy;
+        }
+        % Draw the header, initial state and final state
+        \litmusset{table construction}
+      \end{scope}
+    },
+  },
+}
+
+\litmusset{
+  rmem model/relaxed/.style={
+    /litmus/final state forbidden,
+  },
+}
+
+% \litmusset{
+%   table shape/.is choice,
+%   table shape/going right/.style={},
+%   table shape/3/.style={},
+%   table shape/4/.style={},
+%   table shape=going right,
+%
+%   first thread below second/.style 2 args={
+%     /tikz/evaluate={
+%       let \tid = #1;
+%       \ts = int(#1 + 1);
+%       \below@ts = int(#2 + 1);
+%       let \prev@ts = #1;
+%     },
+%     /litmus/instructions/.append style={
+%       /tikz/evaluate if={\lit@tid == \tid} then {
+%         below={4ex of threads-\below@ts.south west},
+%       },
+%       /tikz/evaluate if={\lit@tid == \tid + 1} then {
+%         right=of threads-\prev@ts.north east,
+%       },
+%     },
+%     /litmus/@litmus table/.append style={
+%       /tikz/execute at end scope={
+%         \begin{scope}[/litmus/.cd scope={every table scope/.try}]
+%           \begin{scope}[on background layer]
+%             \draw (threads-\ts.north west) -- (threads-\ts.north east);
+%             \lit@ifnodeexists{thread \tid\space header}{% then
+%               \draw (thread \tid\space header.north -| threads-\ts.west) -- (thread \tid\space header.north -| threads-\ts.east);
+%             }{}%
+%           \end{scope}
+%         \end{scope}
+%       },
+%     },
+%   },
+% }
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% \input wrappers
+% for all the following macros:
+%   #1 - tikz options (optional)
+%   #2 - mode ('events', 'assem' or 'full')
+%   #3 - .tikz file without the suffix
+
+\newcommand{\inputlitmus}[3][]{%
+  \begin{scope}[/litmus/.cd scope={kind={#2},#1}]%
+    \input{#3.tikz}%
+  \end{scope}%
+}
+
+\newcommand{\inputlitmuspicture}[3][]{%
+  \begin{tikzpicture}[/litmus/.cd scope={every litmus picture/.try,kind={#2},#1}]%
+    \input{#3.tikz}%
+  \end{tikzpicture}%
+}
+
+\newcommand{\inputlitmustable}[3][]{%
+  \inputlitmuspicture[%
+    every litmus table/.try,%
+    read states file={#3},%
+    #1,%
+    @litmus table,%
+  ]{#2}{#3}%
+}

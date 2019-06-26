@@ -1,0 +1,1386 @@
+\ProvidesPackage{litmus}[2018//09/28 v0.0 Typeset litmus test diagrams]
+
+% Give a bit more context when an error is detected
+% \setcounter{errorcontextlines}{999}
+% \tracingall
+
+% For processing the package options
+\RequirePackage{pgfopts}
+
+\RequirePackage{etoolbox}
+\RequirePackage{array}
+\RequirePackage{xcolor}
+\RequirePackage{colortbl}
+\RequirePackage{listings}
+\RequirePackage{tikz}
+\usepgflibrary{mykeys}
+\usetikzlibrary{litmus}
+\usetikzlibrary{litmus.listings}
+
+\newrobustcmd{\lit@error}[2][]{\PackageError{litmus}{#2}{#1}}
+\newrobustcmd{\lit@warning}[1]{\PackageWarning{litmus}{#1}}
+
+\newcommand{\@ifpreamble}{%
+  \ifx\@onlypreamble\@notprerr%
+    \expandafter\@secondoftwo%
+  \else%
+    \expandafter\@firstoftwo%
+  \fi%
+}
+
+% TikZ is missing a macro to test if a library is already loaded
+\newcommand{\@iftikzlibraryloaded}[1]{%
+  \def\lit@temp{#1}%
+  \expandafter\ifx\csname tikz@library@\lit@temp @loaded\endcsname\relax%
+    \expandafter\@secondoftwo%
+  \else%
+    \expandafter\@firstoftwo%
+  \fi%
+}
+
+% Make sure \jobname.figlist is empty so we do not build old externals
+\newwrite\tikzfiglistfile
+\immediate\openout\tikzfiglistfile=\jobname.figlist
+\closeout\tikzfiglistfile
+
+% We write to this file litmus tests for which diagrams are needed
+% Line format: "<context>:<arch>/<test name>"
+\newwrite\litmusfigs@file
+\immediate\openout\litmusfigs@file=\jobname.litmusfigs
+% \closeout\litmusfigs@file
+
+\pgfkeys{%
+  /litmus options/.is family,
+  /litmus options/.unknown/.code={
+    \lit@error{I do not know the key '\pgfkeyscurrentname'!}%
+  },
+}
+\def\litmuscfg{\pgfqkeys{/litmus options}}
+
+\newtoggle{lit@opt@index}
+\newtoggle{lit@opt@extern}
+\newtoggle{lit@opt@hyperref}
+\newtoggle{lit@opt@stricttrans}
+\newtoggle{lit@opt@midrule}% initially false
+\newcounter{lit@opt@midrule@count}
+\setcounter{lit@opt@midrule@count}{5}
+
+\def\lit@opt@ref#1#2#3{\ref{#1}}
+
+% Setup package options
+% NOTE: LaTeX removes all spaces from the package options before passing
+% them to processing, hence options with spaces must also have a key
+% without spaces that '.forward to' the real key.
+\pgfkeys{
+  /litmus options,
+  index/.is toggle flag=lit@opt@index,
+  index=false,
+  index/true/.append code={%
+    \ifcsdef{idx@litmus}{}{%
+      \@ifpreamble{%
+        \RequirePackage{index}%
+        \newindex{litmus}{litmus.idx}{litmus.ind}{Index of Litmus Tests}%
+      }{% else
+        % We are inside the document environment
+        \lit@error[Pass the 'index' option to the litmus package in the preamble.]{The index package is not loaded, or the 'litmus' index is not set properly}%
+      }%
+    }%
+  },
+  extern/.is toggle flag=lit@opt@extern,
+  extern=false,
+  extern/true/.append code={
+    \@iftikzlibraryloaded{external}{}{% else
+      \@ifpreamble{%
+        \usetikzlibrary{external}%
+        % Build each tikz-picture separately and save it in a .pdf file. This
+        % makes subsequent builds much faster.
+        \lit@warning{Using TikZ externalising, some figures might be clipped}%
+        \tikzexternalize[%
+          mode=list and make,
+          only named=true,
+          prefix=\jobname-externals/,
+          up to date check=simple,
+        ] % activate!
+        \pgfkeys{%
+          % The initial value is \pgfimage{#1} and that seems to not look
+          % for files in TEXTINPUTS.
+          % The double grouping is needed to handle names with '.'
+          /pgf/images/include external/.code={\includegraphics{{{##1}}}},
+        }%
+      }{% else
+        % We are inside the document environment
+        \lit@error[Pass the 'extern' option to the litmus package in the preamble.]{The TikZ library 'external' is not loaded}%
+      }%
+    }%
+  },
+  extern/true/.append style={/tikz/external/export/.try=true},
+  extern/false/.append style={/tikz/external/export/.try=false},
+  hyperref/.is toggle flag=lit@opt@hyperref,
+  hyperref=false,
+  hyperref/true/.append code={
+    \@ifpreamble{%
+      % We are in the preamble
+      \RequirePackage{hyperref}%
+    }{% else
+      % We are inside the document environment
+      % I hope hyperref was loaded!
+    }%
+  },
+  %
+  % Litmus name parsing options:
+  strict translation/.is toggle flag=lit@opt@stricttrans,
+  strict translation=false,
+  stricttranslation/.forward to=/litmus options/strict translation,
+  %
+  % Typesetting litmus name options:
+  default arch/.store in=\lit@opt@defultarch,
+  default arch=GEN,
+  defaultarch/.forward to=/litmus options/default arch,
+  target arch/.store in=\lit@opt@targetarch,
+  target arch=,
+  targetarch/.forward to=/litmus options/target arch,
+  target figs/.store in=\lit@opt@targetfigs,
+  target figs=,
+  targetfigs/.forward to=/litmus options/target figs,
+  %
+  % Typeset \litmusref. The argument should be a macro that takes
+  % the following arguments and typesets a reference:
+  % #1 is set to the label of the litmus figure;
+  % #2 is set to the target architecture;
+  % #3 is set to the target name.
+  litmus ref/.code={\let\lit@opt@ref=#1},
+  litmusref/.forward to=/litmus options/litmus ref,
+  %
+  % The 'context' becomes part of the reference name of the litmus test.
+  % This is useful when you want to include the same test multiple times.
+  % ('context' is also prefixed to hyperref links and the externalised name)
+  context/.store in=\lit@opt@context,
+  context=main,
+  %
+  % Draw a midrule in experimental result tables every #1 lines
+  % 'exp results midrule=none' - do not draw midrules (default)
+  % 'exp results midrule=<n>'  - draw midrule every <n> rows
+  % 'exp results midrule'      - draw midrule every <n> rows, where
+  %                              <n> is the value that was set last
+  %                              (initialy 5)
+  exp results midrule/.style={
+    /utils/if no value={#1} then {
+      /utils/exec={\toggletrue{lit@opt@midrule}},
+    } else {
+      /utils/exec={\def\lit@temp{#1}},
+      /litmus options/@exp results midrule=#1,
+    },
+  },
+  expresultsmidrule/.forward to=/litmus options/exp results midrule,
+  @exp results midrule/.is choice,
+  @exp results midrule/none/.code=\togglefalse{lit@opt@midrule},
+  @exp results midrule/0/.code=\togglefalse{lit@opt@midrule},
+  @exp results midrule/.unknown/.code={%
+    \toggletrue{lit@opt@midrule}%
+    \setcounter{lit@opt@midrule@count}{\lit@temp}%
+  },
+}
+
+\ProcessPgfPackageOptions{/litmus options}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%
+%% Utils
+%%
+
+% Used as a delimiter in macro arguments
+\def\lit@del{}
+
+% '\ebars...|...|' will expand (using \edef) everything between the
+% bars before expanding everything that is before the first bar.
+% Both ellipsis' must be balanced text.
+% NOTE: '\ebars\foo|{<arg>}|' will strip one level of braces, hence
+% use '\ebars\foo|{{<arg>}}|' instead.
+\def\ebars#1|#2|{%
+  \begingroup%
+    \def\ebars@tempA{\endgroup #1}%
+    \edef\ebars@tempB{#2}%
+    \expandafter\ebars@tempA\ebars@tempB%
+}
+
+\newcounter{lit@toks@count}
+% '\counttoks{<arg>}' sets the counter lit@toks@count to the number of
+% tokens in <arg>.
+\def\counttoks#1{%
+  \setcounter{lit@toks@count}{0}%
+  \ifstrempty{#1}{}{\@counttoks#1\lit@del}%
+}
+\def\@counttoks#1#2\lit@del{%
+  \stepcounter{lit@toks@count}%
+  \ifstrempty{#2}{}{\@counttoks#2\lit@del}%
+}
+
+% \ifcharequal{<char1>}{<char2>}{<true>}{<false>}
+%   LaTeX version of \if.
+% NOTE: <char1> and <char2> must each be a single letter.
+\newcommand{\ifcharequal}[2]{%
+  \if#1#2%
+    \expandafter\@firstoftwo%
+  \else%
+    \expandafter\@secondoftwo%
+  \fi%
+}
+
+% \ifcharin{<char>}{<string>}{<true>}{<false>}
+%   Expands to <true> iff <char> appears in <string>, otherwise
+%   expands to <false>.
+% NOTE: <char> must be a single letter; <string> may be empty in which
+% case the whole thing expands to <false>.
+\newcommand{\ifcharin}[2]{%
+  \ifstrempty{#2}{%
+    \@secondoftwo%
+  }{% else
+    \@ifcharin{#1}#2\lit@del%
+  }%
+}
+\def\@ifcharin#1#2#3\lit@del{%
+  \ifcharequal{#1}{#2}{%
+    \@firstoftwo%
+  }{% else
+    \ifstrempty{#3}{\@secondoftwo}{\@ifcharin{#1}#3\lit@del}%
+  }%
+}
+
+% \ifanycharin{<chars>}{<string>}{<true>}{<false>}
+%   Expands to <true> iff any of the letters in <chars> appears in
+%   <string>, otherwise expands to <false>.
+% NOTE: <chars> must not be empty; <string> may be empty in which
+% case the whole thing expands to <false>.
+\newcommand{\ifanycharin}[2]{\@ifanycharin#1\lit@del{#2}}
+\def\@ifanycharin#1#2\lit@del#3{%
+  \ifcharin{#1}{#3}{%
+    \@firstoftwo%
+  }{% else
+    \ifstrempty{#2}{\@secondoftwo}{\@ifanycharin#2\lit@del{#3}}%
+  }%
+}
+
+% Macros similar to \@ifstar
+% Example:
+%   \newcommand{\foo}{\@ifplus{\@foo@plus}{\@foo}}
+%   \newcommand{\@foo@plus}...
+%   \newcommand{\@foo}...
+\newcommand\@ifplus[1]{\@ifnextchar +{\@firstoftwo{#1}}}
+\newcommand\@ifminus[1]{\@ifnextchar -{\@firstoftwo{#1}}}
+
+% Create a macro with distinct behaviour for every value
+% Example:
+%   \newswitch[<default replace>]\foo
+%   \switchcase\foo{<case 1>}{<replace 1>}
+%   \switchcase\foo{<case 2>}{<replace 2>}
+%   ...
+\newrobustcmd\newswitch[2][]{
+  \ifdef{#2}{%
+    \lit@error[Use \string\renewswitch\space to redefine an existing switch.]{Switch \string#2\space already defined.}%
+  }{% else
+    \csdef{\string#2@undef@cases}{}%
+    % This must be expandable!!!
+    \newcommand{#2}[1]{%
+      \ifcsdef{\string#2@case@##1}{\csuse{\string#2@case@##1}}{#1}%
+    }%
+  }%
+}
+\newrobustcmd\renewswitch[2][]{%
+  \ifdef{#2}{%
+    \csuse{\string#2@undef@cases}%
+    \csdef{\string#2@undef@cases}{}%
+    \renewcommand{#2}[1]{%
+      \ifcsdef{\string#2@case@##1}{\csuse{\string#2@case@##1}}{#1}%
+    }%
+  }{% else
+    \lit@error[Use \string\newswitch\space to define a new switch.]{Switch \string#2\space undefined.}%
+  }%
+}
+\newrobustcmd\switchcase[3]{%
+  \ifdef{#1}{%
+    \csedef{\string#1@undef@cases}{%
+      \csexpandonce{\string#1@undef@cases}%
+      \noexpand\csundef{\string#1@case@#2}%
+    }%
+    \csdef{\string#1@case@#2}{#3}%
+  }{% else
+    \lit@error[Use \string\newswitch\space to define a new switch.]{Switch \string#1\space undefined.}%
+  }%
+}
+
+% \ifincsvlist{<item>}{<csv list>}{<true>}{<false>}
+%   Expands to <true> if <item> is in <csv list>, otherwise expands to
+%   <false>.
+%   NOTE: <item> must not include the chars '#', '{' and '}'.
+%   NOTE: sensitive to spaces.
+%   NOTE: \ifincsvlist{}{}{true}{false} expands to true.
+\newrobustcmd\ifincsvlist[2]{%
+  \begingroup%
+    \def\@ifincsvlist##1,#1,##2\lit@del{%
+  \endgroup%
+      \ifstrempty{##2}{\@secondoftwo}{\@firstoftwo}%
+    }\@ifincsvlist,#2,#1,\lit@del%
+}
+
+% \switchcsvlist{<csv list>}{<handlers>}
+%   Expands to <handler n+1>{<item 1>}{<item 2>}...{<item n>}, where
+%   'n' is the number of items in <csv list>; <item i> is the i'th
+%   item of <csv list> (<item 1> is the left most item); and
+%   <handler n+1> is the 'n+1' handler from <handlers> (this is also a
+%   csv list with <handler 1> being the left most item).
+%   NOTE: If <handlers> has only 'm' handlers, for some 'm < n+1',
+%   <handler m> is used and the last argument (m-1) is the rest of the
+%   items from <csv list>.
+%   Examples:
+%     '\switchcsvlist{}{\empty,\one,\two}' expands to '\empty'
+%     '\switchcsvlist{1}{\empty,\one,\two}' expands to '\one{1}'
+%     '\switchcsvlist{1,2}{\empty,\one,\two}' expands to '\two{1}{2}'
+%     '\switchcsvlist{1,2,3}{\empty,\one,\two}' expands to '\two{1}{2,3}'
+\newcommand\switchcsvlist[2]{\@switchcsvlist{#1}#2,\lit@del}
+\def\@switchcsvlist#1#2,#3\lit@del{%
+  \ifstrempty{#1}{%
+    #2%
+  }{% else
+    \ifstrempty{#3}{%
+      #2{#1}%
+    }{% else
+      \@@switchcsvlist#1,\lit@del #3\lit@del{}%
+    }%
+  }%
+}
+\def\@@switchcsvlist#1,#2\lit@del #3,#4\lit@del#5{%
+  \ifstrempty{#2}{%
+    #3#5{#1}%
+  }{% else
+    \ifstrempty{#4}{%
+      \@@@switchcsvlist{#3#5}#1,#2\lit@del%
+    }{% else
+      \@@switchcsvlist#2\lit@del #4\lit@del{#5{#1}}%
+    }%
+  }%
+}
+\def\@@@switchcsvlist#1#2,\lit@del{#1{#2}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%
+%% Litmus names
+%%
+
+% When translating a litmus name, if an edge in the source name does
+% not have a translation to the target architecture and 'strict
+% translation' is set, a compilation error occurs, otherwise the edge
+% is copied to the translated name as is.
+
+% Typeset the litmus name #1/#2 translated to architecture #3.
+%   #1: source architecture (GEN, A64, PPC, RV, x86)
+%   #2: litmus test name (e.g. MP+fens)
+%   #3: target architecture
+
+\newrobustcmd{\thelitmusname}[3]{%
+  \begingroup%
+    \ebars\@parsename|{#1}{#2}{#3}|\@parsename@res%
+  \endgroup%
+}
+
+% Defines the macro #1 to be the expanded litmus name in arch #4.
+%   #1: macro name (e.g. \foo)
+%   #2: source architecture (GEN, A64, PPC, RV, x86)
+%   #3: litmus test name (e.g. MP+fens)
+%   #4: target architecture
+\newrobustcmd{\expandedlitmusname}[4]{%
+  \begingroup%
+    \ebars\@parsename|{#2}{#3}{#4}|%
+  \ebars\endgroup\def#1|{{\@parsename@res}}|%
+}
+
+% \newlitmusnametrans{<src-arch>}{<src-name>}{<t-arch>}{<t-name>}
+%   Specifies that the translation of <src-arch>/<src-name> to <t-arch>
+%   is <t-name>.
+% Example: \newlitmusnametrans{GEN}{MP+addrs}{A64}{MP+addrs+V2}
+\newrobustcmd{\newlitmusnametrans}[4]{%
+  \ifcsdef{lit@name:#1/#2/#3}{%
+    \lit@error[Use \string\renewlitmusnametrans\space instead of \string\newlitmusnametrans]{Translation of #1/#2 to #3 already defined (\csuse{lit@name:#1/#2/#3}).}%
+  }{% else
+    \csdef{lit@name:#1/#2/#3}{#4}%
+  }%
+}
+% Same as \newlitmusnametrans but overwrites an existing translation.
+\newrobustcmd{\renewlitmusnametrans}[4]{%
+  \ifcsdef{lit@name:#1/#2/#3}{%
+    \csdef{lit@name:#1/#2/#3}{#4}%
+  }{% else
+    \lit@error[Use \string\newlitmusnametrans\space instead of \string\renewlitmusnametrans]{Translation of #1/#2 to #3 undefined.}%
+  }%
+}
+
+% \litmusedgetransannot{<src-arch>/<t-arch>}{<src-ann-1>/<t-ann-1>,...}
+% Example: \litmusedgetransannot{A64/RV}{p/p,a/aq,l/rl}
+\newrobustcmd{\litmusedgetransannot}[2]{\csdef{lit@edge@annot:#1}{#2}}
+
+% \litmusedgetrans{<src-arch>}{<src-edge>}{<t-arch-1>:<t-edge-1>,...}
+%   Specifies that when <src-arch> litmus name are translated to
+%   <t-arch-n>, <src-edge> should be translated to <t-edge-1>.
+% Example: \litmusedgetrans{GEN}{fen}{A64:dmb.sy,RV:fence.rw.rw}
+\newrobustcmd{\litmusedgetrans}[3]{%
+  \forcsvlist{\@litmusedgetrans{#1}{#2}}{#3}%
+}
+\newcommand{\@litmusedgetrans}[3]{\@@litmusedgetrans{#1}{#2}#3\lit@del}%
+\def\@@litmusedgetrans#1#2#3:#4\lit@del{%
+  \@@@litmusedgetrans{#1}{#2}{#3}{#4}%
+  \ifcsdef{lit@edge@annot:#1/#3}{%
+    % Add memory access annotations translation of the form
+    % <edge><a1><a2> ==> <edge'><a1'><a2'>
+    % Example: RV/fenrlaq ==> A64/dmb.syla
+    \def\@@annleftright##1/##2\lit@del##3/##4\lit@del{%
+      \@@@litmusedgetrans{#1}{#2##1##3}{#3}{#4##2##4}
+    }%
+    \def\@annleftright##1##2{\@@annleftright##1\lit@del##2\lit@del}%
+    \def\@annleft##1{%
+      \ebars\forcsvlist{\@annleftright{##1}}|{{\csuse{lit@edge@annot:#1/#3}}}|%
+    }%
+    \ebars\forcsvlist{\@annleft}|{{\csuse{lit@edge@annot:#1/#3}}}|%
+  }{}%
+}
+\def\@@@litmusedgetrans#1#2#3#4{%
+  \csdef{lit@edge:#1/#2/#3}{#4}%
+  % This is for handling names like LB+addrs
+  \csdef{lit@edge:#1/#2s/#3}{#4s}%
+}
+
+\newcommand{\trans@edge}[3]{%
+  \ifcsdef{lit@edge:#1/#3/#2}{%
+    \csuse{lit@edge:#1/#3/#2}%
+  }{% else
+    \iftoggle{lit@opt@stricttrans}{}{#3}%
+  }%
+}
+
+\def\ifbeginsb#1{%
+  \ifstrempty{#1}{\@secondoftwo}{\@ifbeginsb#1[\lit@del}%
+}
+\def\@ifbeginsb#1[#2\lit@del{\ifstrempty{#1}}
+\def\@gobblebeginsb [#1\lit@del{#1}
+
+
+\def\lit@del@a{a}
+\def\lit@del@b{b}
+\def\ifendsb#1{\@ifendsb#1\lit@del@a]\lit@del@b\lit@del}
+\long\def\@ifendsb#1]#2#3\lit@del{%
+  \ifdefequal{#2}{\lit@del@a}{%
+    \@firstoftwo%
+  }{% else
+    \ifdefequal{#2}{\lit@del@b}{%
+      \@secondoftwo%
+    }{% else
+      \@ifendsb#2#3\lit@del%
+    }%
+  }%
+}
+\def\@gobbleendsb#1]\lit@del{#1}
+
+\def\get@next@thread#1+#2\lit@del{%
+  \def\next@thread{#1}%
+  \def\threads@buffer{#2}%
+}
+
+\def\get@next@edge#1-#2\lit@del{%
+  \def\next@edge{#1}%
+  \def\edges@buffer{#2}%
+}
+
+% \@parsename{<src-arch>}{<name>}{<t-arch>}
+%   Translate <name> from <src-arch> to <t-arch>.
+% NOTE: Some litmus tests have a '+' in their base name (e.g. 2+2W)
+% and we don't want to translate the part after the '+' as edges,
+% specially in strict mode where this is likely to cause an error.
+% To deal with that we assume any prefix that does not include a
+% lowercase letter after the first '+' and ends with a '+' or the end
+% of the name, is part of the base name.
+\newrobustcmd{\@parsename}[3]{%
+  \ifcsdef{lit@name:#1/#2/#3}{%
+    % A special translation was specified from #1/#2 to #3
+    \edef\@parsename@res{\csuse{lit@name:#1/#2/#3}}%
+  }{% else
+    \ifstrequal{#1}{#3}{%
+      % Trying to translate from an arch to itself.
+      \def\@parsename@res{#2}%
+    }{% else
+      \def\threads@buffer{#2+}%
+      % Everything up to the first '+' is part of the base name
+      \expandafter\get@next@thread\threads@buffer\lit@del%
+      \edef\@parsename@res{\expandonce\next@thread}%
+      % Try to extend the base name as long as there are no lowercase letters
+      \@parsebasename{#1}{#3}%
+      % Finally, translate the edges of each thread
+      \@parsethreads{#1}{#3}%
+    }%
+  }%
+}
+
+\newrobustcmd{\@parsebasename}[2]{%
+  \ifdefempty{\threads@buffer}{}{% else
+    \expandafter\get@next@thread\threads@buffer\lit@del%
+    \ebars\ifanycharin{abcdefghijklmnopqrstuvwxyz}|{{\expandonce\next@thread}}|{%
+      % We found a lowercase letter, unread the part and return
+      \edef\threads@buffer{\expandonce\next@thread+\expandonce\threads@buffer}%
+    }{% else
+      % This seems to be part of the base name
+      \edef\@parsename@res{\expandonce\@parsename@res +\expandonce\next@thread}%
+      \@parsebasename{#1}{#2}%
+    }%
+  }%
+}
+
+\newrobustcmd{\@parsethreads}[2]{%
+  \ifdefempty{\threads@buffer}{}{% else
+    \expandafter\get@next@thread\threads@buffer\lit@del%
+    \edef\@parsename@res{\expandonce\@parsename@res +}%
+    \edef\edges@buffer{\expandonce\next@thread -}%
+    \@parsethread{#1}{#2}%
+    \@parsethreads{#1}{#2}%
+  }%
+}
+
+\newrobustcmd{\@parsethread}[2]{%
+  \expandafter\get@next@edge\edges@buffer\lit@del%
+  \expandafter\ifbeginsb\expandafter{\next@edge}{%
+    \edef\next@edge{\expandafter\@gobblebeginsb\next@edge\lit@del}%
+    \def\@beginsb{[}%
+  }{%
+    \def\@beginsb{}%
+  }%
+  \expandafter\ifendsb\expandafter{\next@edge}{%
+    \edef\next@edge{\expandafter\@gobbleendsb\next@edge\lit@del}%
+    \def\@endsb{]}%
+  }{%
+    \def\@endsb{}%
+  }%
+  \def\@trans@edge{\trans@edge{#1}{#2}}%
+  \edef\@trans@edge{\expandafter\@trans@edge\expandafter{\next@edge}}%
+  \ifdefempty{\@trans@edge}{\lit@error[Use \string\litmusedgetrans\space to specify translation.]{Can not translate the #1 edge \next@edge\space to #2.}}{}%
+  \edef\@parsename@res{\expandonce\@parsename@res\@beginsb\expandonce\@trans@edge\@endsb}%
+  \ifdefempty{\edges@buffer}{}{% else
+    \edef\@parsename@res{\expandonce\@parsename@res -}%
+    \@parsethread{#1}{#2}%
+  }%
+}
+
+\input{litmus.names.cfg}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%
+%% Litmus diagrams
+%%
+
+% PS: use only one highlight colour for memory accesses and barriers
+\colorlet{barrier color}{memory color}
+\colorlet{branch color}{black}
+\colorlet{code label color}{black}
+\lstdefinestyle{xlitmus}{
+  style=litmus,
+  basicstyle=\footnotesize\ttfamily,
+  % Barriers:
+  keywordstyle=[6]\bfseries\color{barrier color},
+}
+
+\lstalias{A64}{AArch64}
+\lstalias{PPC}{Power}
+\lstalias{RV}{RISCV}
+
+\litmusset{
+  A64/.style=/litmus/AArch64,
+  PPC/.style=/litmus/Power,
+  RV/.style=/litmus/RISCV,
+  GEN/.style={/litmus/.cd scope={every GEN/.try}},
+  %
+  GEN from A64/.style={
+    /litmus/isb/.default={ifen},
+    /litmus/ctrl+isb/.default={ctrl+ifen},
+    /litmus/dmb/.default={fen},
+    /litmus/dmb st/.default={fen.w.w},
+    /litmus/dmb ld/.default={fen.r.rw},
+    /litmus/.cd scope={every GEN from A64/.try},
+  },
+  % TODO: add 'GEN from PPC' and 'GEN from RV'
+}
+% Typeset an architecture name
+\newswitch[{\lit@error[Valid architectures: GEN, A64, RV, PPC, x86]{unknown arch #1}}]\arch
+  \switchcase\arch{GEN}{Generic}
+  \switchcase\arch{A64}{AArch64}
+  \switchcase\arch{RV}{RISC-V}
+  \switchcase\arch{PPC}{Power}
+  \switchcase\arch{x86}{x86}
+
+\litmusset{%
+  use listing={style=xlitmus},
+  threads baseline/.style={
+    /litmus/thread 0/.append style={every thread header/.append style={alias=thread-0}},
+    baseline=(thread-0.base),
+  },
+  every litmus/.append style={
+    every node/.append style={node font=\sffamily},
+  },
+  every litmus table/.append style={
+    every state/.append style={
+      state prefix font=\normalsize\sffamily,
+      node font=\footnotesize\ttfamily,
+%       inner sep=1pt,
+    },
+    every final state allowed/.style={fill=green!15},
+    every final state forbidden/.style={fill=red!15},
+    every hw observations prefix/.style={node font=\footnotesize\sffamily},
+    every hw observation/.style={node font=\footnotesize\sffamily},
+    expected observations allowed/.style={
+      experimental result/every not observed/.style=blue,
+    },
+    expected observations forbidden/.style={
+      experimental result/every observed/.style=red,
+    },
+    % Show line numbers:
+%     every code line/.append style={
+%       append after command={
+%         node[node distance=0pt,
+%           inner xsep=1pt, right=of \tikzlastnode.west
+%         ] {\tiny\texttt{##1.}}
+%       },
+%     },
+    % Alternating colours:
+%     every odd code line/.append style={fill=black!10},
+  },
+  every assem litmus/.append style={
+    every assem/.append style={inner xsep=2pt}, % Used to be 1pt, PS asked to make it bigger
+    % Leave some room for line number:
+%     thread 0/.append style={execute at begin node={\phantom{\tiny\texttt{8.}}}},
+  },
+  overlay fix/.style={
+    /litmus/every relation/.append style={
+      edge node={
+        {[overlay=false, inner sep=2pt, outer sep=0]
+          % Add 11 nodes along the line
+          foreach \pos in {0,0.1,...,1} {node[pos=\pos] {}}
+        }
+      },
+    },
+    /litmus/every label/.append style={overlay=false},
+  },
+  every events litmus/.append style={
+    % Exclude edges (and their labels) from the picture bounding box
+    every relation/.append style=overlay,
+    every init/.append style=overlay,
+    % Fix externalising issue with curved (+overlay) edges
+    /litmus options/extern/.if true=then {/litmus/overlay fix},
+    mem access/Racq/.code={R\textsubscript{aq}},
+    mem access/Wrel/.code={R\textsubscript{rl}},
+    every event box/.append style={outer sep=2pt},
+    every events box/.append style={outer sep=1pt},
+  },
+  missing file/.style={
+    draw=red, very thick,
+    fill=red!25,
+    font=\tiny\bf, align=left,
+  },
+}
+
+\tikzset{
+  % 'A64/MP+dmb.sys/.do not extern' will prevent externalising the assem
+  % and events figures of A64/MP+dmb.sys.
+  /handlers/.do not extern/.style={%
+    \pgfkeyscurrentpath/.get key parts=\@key,
+    \@key/do not extern/.style/.expanded={
+      /utils/package warning={litmus}{Not externalising '\@key'.},
+      /tikz/external/export next/.try=false,
+    },
+  },
+  debug/.style={
+    /litmus/every litmus/.append style={
+      execute at end scope={
+        \draw[dashed, thin, opacity=0.2]
+          (current bounding box.south west) rectangle (current bounding box.north east);
+      },
+    },
+    every node/.append style=draw,
+    /litmus/show code label=left,
+    /litmus/code label/.code 2 args={{\color{black}\tiny ##2}},
+  },
+}
+
+% Typeset a litmus test assembly table
+%   #1: (optional) options for \inputlitmustable
+%   #2: source architecture (GEN, A64, PPC, RV, x86)
+%   #3: litmus test name (e.g. MP)
+%   #4: target architecture (empty implies #2)
+\newrobustcmd{\litmusassem}[4][]{%
+  \ebars\litmusassem@e{#1}|{#2}{#3}{#4}|%
+}
+\newrobustcmd{\litmusassem@e}[4]{%
+  {%
+    \expandedlitmusname\@name{#2}{#3}{#4}%
+    \ifstrempty{#4}{\def\@arch{#2}}{\def\@arch{#4}}%
+    \def\arch@name{\@arch/\@name}%
+    \immediate\write\litmusfigs@file{\lit@opt@context:\arch@name}%
+    \litmusset{\arch@name/do not extern/.try}%
+    \iftoggle{lit@opt@extern}{%
+      \tikzsetnextfilename{\lit@opt@context/\arch@name.assem}%
+    }{}%
+    \IfFileExists{\arch@name.tikz}{%
+      \inputlitmustable[%
+        \@arch,
+        % This is mostly needed for RV, where 'architecture', as written
+        % to the .state.tex file, is "RISCV" (instead of "RISC-V")
+        architecture/.expanded={\arch{\@arch}},
+        compute assem text width=\arch@name,
+        {\arch@name}/assem/.try with warning,
+        #1,
+      ]{assem}{\arch@name}%
+    }{% else
+      \lit@warning{Missing litmus test file \arch@name.tikz (assem)}%
+      \begin{tikzpicture}%
+        \node[/litmus/missing file] {missing (assem) target: \arch@name.tikz\\source: #2/#3};%
+      \end{tikzpicture}%
+    }%
+  }%
+}
+
+% Typeset a litmus test events diagram
+%   #1: (optional) options for \inputlitmuspicture
+%   #2: source architecture (GEN, A64, PPC, RV, x86)
+%   #3: litmus test name (e.g. MP)
+%   #4: target architecture (empty implies #2)
+\newrobustcmd{\litmusevents}[4][]{%
+  \ebars\litmusevents@e{#1}|{#2}{#3}{#4}|
+}
+\newrobustcmd{\litmusevents@e}[4]{%
+  {%
+    \expandedlitmusname\@name{#2}{#3}{#4}%
+    \ifstrempty{#4}{\def\@arch{#2}}{\def\@arch{#4}}%
+    \def\arch@name{\@arch/\@name}%
+    \immediate\write\litmusfigs@file{\lit@opt@context:\arch@name}%
+    \litmusset{\arch@name/do not extern/.try}%
+    \iftoggle{lit@opt@extern}{%
+      \tikzsetnextfilename{\lit@opt@context/\arch@name.events}%
+    }{}%
+    \IfFileExists{\arch@name.tikz}{%
+      \inputlitmuspicture[%
+        \@arch,
+        {\arch@name}/events/.try with warning,
+        #1,
+      ]{events}{\arch@name}%
+    }{% else
+      \lit@warning{Missing litmus test file \arch@name.tikz (events)}%
+      \begin{tikzpicture}%
+        \node[/litmus/missing file] {missing (events) target:\arch@name.tikz\\source: #2/#3};%
+      \end{tikzpicture}%
+    }%
+  }%
+}
+
+% Typeset a litmus test full diagram
+%   #1: (optional) options for \inputlitmustable
+%   #2: source architecture (GEN, A64, PPC, RV, x86)
+%   #3: litmus test name (e.g. MP)
+%   #4: target architecture (empty implies #2)
+\newrobustcmd{\litmusfull}[4][]{%
+  \ebars\litmusfull@e{#1}|{#2}{#3}{#4}|
+}
+\newrobustcmd{\litmusfull@e}[4]{%
+  {%
+    \expandedlitmusname\@name{#2}{#3}{#4}%
+    \ifstrempty{#4}{\def\@arch{#2}}{\def\@arch{#4}}%
+    \def\arch@name{\@arch/\@name}%
+    \immediate\write\litmusfigs@file{\lit@opt@context:\arch@name}%
+    \litmusset{\arch@name/do not extern/.try}%
+    \iftoggle{lit@opt@extern}{%
+      \tikzsetnextfilename{\lit@opt@context/\arch@name.full}%
+    }{}%
+    \IfFileExists{\arch@name.tikz}{%
+      \inputlitmustable[%
+        \@arch,
+        % This is mostly needed for RV, where 'architecture', as written
+        % to the .state.tex file, is "RISCV" (instead of "RISC-V")
+        architecture/.expanded={\arch{\@arch}},
+        {\arch@name}/full/.try with warning,
+        #1,
+      ]{full}{\arch@name}%
+    }{% else
+      \lit@warning{Missing litmus test file \arch@name.tikz (full)}%
+      \begin{tikzpicture}%
+        \node[/litmus/missing file] {missing (full) target:\arch@name.tikz\\source: #2/#3};%
+      \end{tikzpicture}%
+    }%
+  }%
+}
+
+% A hyperref target for a litmus figure
+%   #1: csv list of the form 'arhc:name,...'
+%   #2: litmus figure code
+\newrobustcmd{\litmushypertarget}[2]{%
+  \ebars\litmushypertarget@e|{{#1}}|{#2}%
+}
+\newrobustcmd{\litmushypertarget@e}[2]{%
+  \iftoggle{lit@opt@hyperref}{
+    \begingroup%
+    \def\@target{\endgroup}%
+    \def\do##1{%
+      \expandafter\def\expandafter\@target\expandafter{\@target\hypertarget{ht:litmus:\lit@opt@context:##1}\bgroup}%
+    }%
+    \docsvlist{#1}%
+    \expandafter\def\expandafter\@target\expandafter{\@target #2}%
+    \def\do##1{%
+      \expandafter\def\expandafter\@target\expandafter{\@target\egroup}%
+    }%
+    \docsvlist{#1}%
+    \@target%
+  }{%
+    #2%
+  }%
+}
+
+% Typeset a litmus test diagram for a single target
+%   #1: architecture (GEN, A64, PPC, RV, x86)
+%   #2: litmus test name (e.g. MP)
+%   #3: target architecture
+\newrobustcmd{\litfig@one}[3]{%
+  \ebars\litfig@one@e|{#1}{#2}{#3}|%
+}
+\newrobustcmd{\litfig@one@e}[3]{%
+  \ifstrequal{#3}{GEN}{%
+    \litmusevents[threads baseline]{#1}{#2}{\litmusgensource}%
+  }{%
+    \litmusevents[threads baseline]{#1}{#2}{#3}%
+  }\ %
+  \litmusassem[threads baseline]{#1}{#2}{#3}%
+}
+
+% Typeset a litmus test diagram for two targets
+%   #1: architecture (GEN, A64, PPC, RV, x86)
+%   #2: litmus test name (e.g. MP)
+%   #3: target architecture
+%   #4: target architecture
+\newrobustcmd{\litfig@two}[4]{%
+  \litfig@list{#1}{#2}{#3}{#4}%
+}
+
+\newrobustcmd{\litfig@three}[5]{%
+  \litfig@list{#1}{#2}{#3}{#4,#5}%
+}
+
+\newrobustcmd{\litfig@four}[6]{%
+  \litfig@list{#1}{#2}{#3}{#4,#5,#6}%
+}
+
+\newrobustcmd{\litfig@five}[7]{%
+  \litfig@list{#1}{#2}{#3}{#4,#5,#6,#7}%
+}
+
+\newrobustcmd{\litfig@six}[8]{%
+  \litfig@list{#1}{#2}{#3}{#4,#5,#6,#7,#8}%
+}
+
+\newrobustcmd{\litfig@sevenandmore}[9]{%
+  \litfig@list{#1}{#2}{#3}{#4,#5,#6,#7,#8,#9}%
+}
+
+% Typeset a litmus test diagram for at least two targets
+%   #1: architecture (GEN, A64, PPC, RV, x86)
+%   #2: litmus test name (e.g. MP)
+%   #3: target architecture
+%   #4: list of target architectures (at least one)
+\newrobustcmd{\litfig@list}[4]{%
+  \ebars\litfig@list@e|{#1}{#2}{#3}{#4}|%
+}
+\newrobustcmd{\litfig@list@e}[4]{%
+  {%
+    \def\@widths{\@gobble}%
+    \def\do##1{%
+      \expandedlitmusname\@name{#1}{#2}{##1}%
+      \edef\@widths{\expandonce\@widths,computedwidthof{"##1/\@name"}}%
+    }%
+    \docsvlist{#3,#4}%
+    \litmusset{%
+      every assem/.append style={text width={max(\@widths)}},
+    }%
+    \def\do##1{%
+      \litmusassem[baseline=(table header.north)]{#1}{#2}{##1}\\%
+    }%
+    \litmusevents[threads baseline, GEN from #3/.try]{#1}{#2}{#3}%
+    \begin{tabular}[t]{l}%
+      \rule{0pt}{5.5ex}\litmusassem[threads baseline]{#1}{#2}{#3}\\%
+      \docsvlist{#4}%
+    \end{tabular}%
+  }%
+}
+% Typeset a litmus figure.
+%   #1: figure placement specifier (default: htb)
+%   #2: architecture (GEN, A64, PPC, RV, x86)
+%   #3: litmus test name (e.g. MP+dmb.sys)
+%   #4: list of target architectures
+%   #5: caption target arch
+\newrobustcmd{\insertlitmusfig}[5][htb]{%
+  \ebars\insertlitmusfig@e|{#1}{#2}{#3}{#4}{#5}|
+}
+\newrobustcmd{\insertlitmusfig@e}[5]{%
+  \expandedlitmusname\@name{#2}{#3}{#5}%
+  \@litmuslabels@e{#2}{#3}{#4}{#5}{fig:litmus:\lit@opt@context:#5:\@name}{\@hypertargets}%
+  \begin{figure}[#1]%
+    \centering%
+    \litmushypertarget{\@hypertargets}{%
+      \ifcsdef{litmusfig@#2/#3}{%
+        \csuse{litmusfig@#2/#3}%
+      }{% else
+        \switchcsvlist{#4}{%
+          \litfig@one{#2}{#3}{#2},% empty list
+          \litfig@one{#2}{#3},%     single arch
+          \litfig@two{#2}{#3},%     two archs
+          \litfig@three{#2}{#3},%   three archs
+          \litfig@four{#2}{#3},%    ...
+          \litfig@five{#2}{#3},%
+          \litfig@six{#2}{#3},%
+          \litfig@sevenandmore{#2}{#3}%
+        }%
+      }%
+    }%
+    \caption{Litmus test \textsf{\thelitmusname{#2}{#3}{#5}}}%
+    \label{fig:litmus:\lit@opt@context:#5:\@name}%
+    \forcsvlist{\litmusindex[textbf]{#2}{#3}}{#5,#4}%
+  \end{figure}%
+}
+
+% Define a litmus figure content
+%   #1: architecture (A64, PPC, RV, x86)
+%   #2: litmus test name (e.g. MP+dmb.sys)
+%   #3: the content of the figure
+\newrobustcmd{\deflitmusfig}[3]{\csdef{litmusfig@#1/#2}{#3}}
+
+% Adds a litmus test to the index
+%   #1: (optional) page number formatting
+%   #2: source architecture
+%   #3: litmus test name
+%   #4: target architecture
+\newrobustcmd{\litmusindex}[4][]{%
+  \ebars\litmusindex@e|{#1}{#2}{#3}{#4}|%
+}
+\newrobustcmd{\litmusindex@e}[4]{%
+  \iftoggle{lit@opt@index}{%
+    {%
+      \expandedlitmusname\@name{#2}{#3}{#4}%
+      \ebars\index[litmus]|{{%
+        \arch@order{#4}@\noexpand\textbf{\arch{#4}}!%
+          \@name @\noexpand\textsf{\thelitmusname{#4}{\@name}{#4}}%
+        |#1%
+      }}|%
+    }%
+  }{}%
+}
+
+% This value is used for sorting the architectures in the index. We
+% want Generic to be first, the others will be sorted alphabetically.
+\newswitch[\arch{#1}]\arch@order
+  \switchcase\arch@order{GEN}{0} % Numbers are sorted before letters
+
+% Typeset a litmus test name. If the package option 'target arch'
+% (stored in \lit@opt@targetarch) is not empty, converts the name to
+% the architecture 'target arch' before typesetting it.
+%   #1: (optional) source architecture (GEN, A64, PPC, RV, x86), the
+%       default is set by the package option 'default arch' (stored in
+%       \lit@opt@defultarch).
+%   #2: litmus test name
+% \litmus  - If the figure does not already exist adds a figure and
+%            prints the name with a link to it. The figure architectures
+%            can be set by the package option 'target figs' (stored in
+%            \lit@opt@targetfigs), empty means the same as the source
+%            architecture (i.e. #1).
+% \litmus+ - Adds a figure and prints the name with a link to it.
+% \litmus- - Prints the name with a link to a pre-existing figure.
+% \litmus* - Prints the name without a figure or a link.
+\newrobustcmd{\@litmusstar}{%
+  \textsf{\thelitmusname{\@sourcearch}{\@sourcename}{\@targetarch}}%
+  \litmusindex{\@sourcearch}{\@sourcename}{\@targetarch}%
+}
+\newrobustcmd{\@litmusminus}{%
+  \iftoggle{lit@opt@hyperref}{%
+    % PS: remove colour from litmus names
+    {\hypersetup{linkcolor=violet}\hyperlink{ht:litmus:\lit@opt@context:\@targetarch:\@targetname}{\@litmusstar}}%
+  }{%
+    \@litmusstar%
+  }%
+}
+\newrobustcmd{\@litmusplus}{%
+  \insertlitmusfig{\@sourcearch}{\@sourcename}{\@targetfigarchs}{\@targetarch}%
+  \@litmusminus%
+}
+\newrobustcmd{\@litmus}{%
+  \ifcsdef{litmusfig@\lit@opt@context @\@targetarch/\@targetname @inc}{%
+    \@litmusminus%
+  }{% else
+    \@litmusplus%
+  }%
+}
+\newrobustcmd{\litmus@args}[1]{\def\litmus@args@next{#1}\@litmus@args}
+\newrobustcmd{\@litmus@args}[2][\lit@opt@defultarch]{%
+  \edef\@sourcearch{#1}%
+  \edef\@sourcename{#2}%
+  \edef\@targetarch{%
+    \ifdefempty{\lit@opt@targetarch}{#1}{\lit@opt@targetarch}%
+  }%
+  \expandedlitmusname\@targetname{#1}{#2}{\@targetarch}%
+  \edef\@targetfigarchs{%
+    \ifdefempty{\lit@opt@targetfigs}{#1}{\lit@opt@targetfigs}%
+  }%
+  \litmus@args@next%
+}
+\newrobustcmd{\litmus}{%
+  \@ifstar{\litmus@args\@litmusstar}{% else
+  \@ifplus{\litmus@args\@litmusplus}{% else
+  \@ifminus{\litmus@args\@litmusminus}{% else
+  \litmus@args\@litmus%
+  }}}%
+}
+
+% Typeset a reference to a litmus figure that was added using \litmus.
+% \litmusref takes the same arguments as \litmus.
+% Uses the package option 'litmus ref' to do the typesetting.
+\newrobustcmd{\litmusref}{\litmus@args\@litmusref}
+\newrobustcmd{\@litmusref}{%
+  \ifcsdef{litmusfig@\lit@opt@context @\@targetarch/\@targetname @label}{%
+    \ebars\lit@opt@ref|{\csuse{litmusfig@\lit@opt@context @\@targetarch/\@targetname @label}}{\@targetarch}{\@targetname}|%
+%     \litmuscfg{litmus ref/.expanded={\csuse{litmusfig@\lit@opt@context @\@targetarch/\@targetname @label}}{\@targetarch}{\@targetname}}%
+  }{% else
+    \lit@warning{A litmus figure reference is missing,^^Jrun latex again.}%
+    ??%
+  }%
+}
+
+% When typesetting a figure for a litmus test use:
+% \litmuslabels[<src arch>]{<test name>}{<label>}{<control sequence>},
+% where <label> is the label of the figure. This will associate
+% <test name> with <label> (for \litmusref) and set <control sequence>
+% to the value you should pass to \litmushypertarget.
+\newrobustcmd{\litmuslabels}{\litmus@args\@litmuslabels}
+\newrobustcmd{\@litmuslabels}{%
+  \ebars\@litmuslabels@e|{\@sourcearch}{\@sourcename}{\@targetfigarchs}{\@targetarch}|
+}
+\newrobustcmd{\@litmuslabels@e}[6]{%
+  \def#6{\@gobble}%
+  \def\do##1{%
+    \expandedlitmusname\@subname{#1}{#2}{##1}%
+    % Check if the litmus test has already been included and give a warning if it has
+    \ifcsdef{litmusfig@\lit@opt@context @##1/\@subname @inc}{%
+      \lit@warning{The litmus figure ##1/\@subname\space already exists, you might want to use the 'context' option (inserting anyway)}%
+    }{}%
+    \csgdef{litmusfig@\lit@opt@context @##1/\@subname @inc}{}%
+    % Check if the reference has changed and give a warning if it has
+    \ifcsdef{litmusfig@\lit@opt@context @##1/\@subname @label}{%
+      {%
+        \edef\@oldref{\csuse{litmusfig@\lit@opt@context @##1/\@subname @label}}%
+        \edef\@newref{#5}%
+        \ifdefstrequal{\@oldref}{\@newref}{}{% else
+          \lit@warning{A litmus figure reference has changed,^^Jrun latex again.}%
+        }%
+      }%
+    }{}%
+    \csxdef{litmusfig@\lit@opt@context @##1/\@subname @label}{#5}%
+    \immediate\write\@auxout{\string\csxdef{litmusfig@\lit@opt@context @##1/\@subname @label}{#5}}%
+    \edef#6{#6,##1:\@subname}%
+  }%
+  \ifincsvlist{#4}{#3}{\docsvlist{#3}}{\docsvlist{#4,#3}}%
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%
+%% Litmus experimental result tables
+%%
+
+\newcounter{lit@midrule}
+\newtoggle{lit@need@midrule}
+
+% A hook right after the top-rule. See \setnextlitmusexpgrouping
+% Redefined to empty after each table
+\def\litmusexpgrouping{}
+
+% This is a column type for litmus results (e.g. "24k/1.2G").
+% The \columncolor is needed only when using \rowcolor, as this is the
+% only way to set the overhangs for individual columns. In particular
+% we need to set the overhangs associated with @{} to 0.
+% \rowcolor is also the reason we use three columns, instead of 'r@{/}l'.
+\newcolumntype{O}{r@{}>{\columncolor{white}[0pt]}c@{}>{\columncolor{white}[0pt][\tabcolsep]}l}
+\newcommand{\litmusexphead}[1]{\multicolumn{3}{@{}c@{}}{#1}}
+
+% '\litmusabrv{<n>}' typesets the three most significant digits of <n>
+% with the suffix 'k' (for thousands), or 'M' (for millions), or 'G'
+% (for billions). The forth MSD is used for rounding, e.g., 10050 is
+% typeset as 10.1k (and not 10.0k).
+% Notes:
+% - Numbers with more than 12 digits are truncated and all the
+%   significant digits, starting from the 10th digit, are printed, e.g.,
+%   1111500000000 is typeset as 1111G.
+% - Numbers with less than 5 digits are typeset as is.
+\newcommand{\litmusabrv}[1]{{%
+  \counttoks{#1}%
+  \ifnumcomp{\value{lit@toks@count}}{>}{12}{%
+    % The number is too big, we will just truncate
+    \pgfmathtodigitlist{\lit@digs}{#1}%
+    \tikzmath{
+      int \c;
+      \c = \value{lit@toks@count} - 9;
+      for \d in \lit@digs {
+        if \c > 0 then {print{\d};};
+        \c = \c - 1;
+      };
+    }%
+    G%
+  }{% else > 12
+    \ifnumcomp{\value{lit@toks@count}}{>}{4}{%
+      % Print only the three MSD, using the forth for rounding
+      \def\lit@msds##1##2##3##4##5\lit@del{##1##2##3##4}%
+      \edef\lit@msds{\lit@msds#1\lit@del}%
+      \pgfmathparse{int(round(\lit@msds / 10))}%
+      \pgfmathtodigitlist{\lit@digs}{\pgfmathresult}%
+      \tikzmath{
+        int \c;
+        if \value{lit@toks@count} > 9 then {\c = \value{lit@toks@count} - 9; let \s = G;} else {
+          if \value{lit@toks@count} > 6 then {\c = \value{lit@toks@count} - 6; let \s = M;} else {
+            \c = \value{lit@toks@count} - 3; let \s = k;
+          };
+        };
+        for \d in \lit@digs {
+          if \c == 0 then {print{.};};%
+          print{\d};
+          \c = \c - 1;
+        };
+      }%
+      \s%
+    }{% else > 4
+      #1%
+    }%
+  }%
+}}
+
+\newcommand{\litmusres}[2]{#1 & / & #2}
+\newcommand{\litmusnores}{\multicolumn{3}{@{}c@{}}{---}}
+
+\newrobustcmd{\litmusresAllow}[2]{%
+  \ifstrequal{#1}{0}{%
+    \litmusres{\color{blue}$^\diamond$\litmusabrv{#1}}{\litmusabrv{#2}}%
+  }{% else
+    \litmusres{\litmusabrv{#1}}{\litmusabrv{#2}}%
+  }%
+}
+\newrobustcmd{\litmusresForbid}[2]{%
+  \ifstrequal{#1}{0}{%
+    \litmusres{\litmusabrv{#1}}{\litmusabrv{#2}}%
+  }{% else
+    \litmusres{\color{red}$^\star$\litmusabrv{#1}}{\litmusabrv{#2}}%
+  }%
+}
+\newrobustcmd{\litmusresUnknown}[2]{%
+  \litmusres{\color{violet}\litmusabrv{#1}}{\color{violet}\litmusabrv{#2}}%
+}
+
+% We check if the denominator is '0', in which case we assume no results
+\def\lit@res#1#2/0#3\lit@del{%
+  \ifstrempty{#3}{%
+    \lit@@res{#1}#2\lit@del%
+  }{% else
+    \lit@@@res{#1}{#2}#3%
+  }%
+}
+\def\lit@@res#1#2/#3\lit@del{#1{#2}{#3}}
+\def\lit@@@res#1#2#3/0{%
+  \ifstrempty{#3}{%
+    \expandonce\litmusnores%
+  }{% else
+    #1{#2}{0#3}
+  }%
+}
+
+%  #1: arch
+%  #2: litmus name
+\newcommand{\litmusexprow}[2]{%
+  % Add a \midrule every few lines
+  \iftoggle{lit@opt@midrule}{%
+    \ifnumcomp{\value{lit@midrule}}{>}{\value{lit@opt@midrule@count}}{%
+      \arrayrulecolor{black!20}%
+      \midrule%
+      \arrayrulecolor{black}%
+      \setcounter{lit@midrule}{1}%
+      \iftoggle{lit@need@midrule}{\global\togglefalse{lit@need@midrule}}{\global\toggletrue{lit@need@midrule}}%
+    }{}%
+    \stepcounter{lit@midrule}%
+  }{}
+  % Read the .states.tex and .hw.tex files
+  \begingroup%
+    \InputIfFileExists{#1/#2.hw.tex}{%
+      \litmusset{
+        read states file={#1/#2},
+        final state result/.get=\lit@status,
+      }%
+    }{% else
+      \def\lit@status{??}%
+      \def\litmusobstotal{0/0}%
+      \def\litmusobservations{}%
+    }%
+    % Sets things according the the status (allowed/forbidden) of the test
+    \ifdefstring{\lit@status}{forbidden}{% Forbid
+      \def\lit@status{Forbid}%
+      \def\@lit@res{\lit@res\litmusresForbid}%
+    }{% else
+      \ifdefstring{\lit@status}{allowed}{% Allow
+        \def\lit@status{Allow}%
+        \def\@lit@res{\lit@res\litmusresAllow}%
+      }{% else unrecognised status
+        \def\@lit@res{\lit@res\litmusresUnknown}%
+      }%
+    }%
+    % Combine everything to a tabular row
+    \edef\lit@row{%
+      \litmus-[#1]{#2} & \lit@status & \expandafter\@lit@res\litmusobstotal/0\lit@del%
+    }%
+    \def\lit@add@res##1{%
+      \edef\lit@row{\expandonce\lit@row & \@lit@res##1/0\lit@del}%
+    }%
+    \ebars\forcsvlist{\lit@add@res}|{{\litmusobservations}}|%
+    \iftoggle{lit@exp@dump@next@tabular}{%
+      \immediate\write\lit@exp@dump@tabular@file{\space\space \expandonce\lit@row \noexpand\\}%
+    }{}%
+    \expandafter\endgroup\lit@row \\%
+}
+
+% Sets \litmusexpgrouping for the next hw results table. Can be used
+% multiple times to create multiple levels (i.e. multiple rows).
+% #1 - (optional) the number of (primitive) columns a single core spans.
+% #2 - A sequence where '-' indicates a core that is not grouped and
+%      '[<text>/<n>]' indicates a group of <n> cores with the header
+%      <text>.
+% NOTE: '\setnextlitmusexpgrouping{}' removes all previously set groupings
+\newcommand{\setnextlitmusexpgrouping}[2][3]{%
+  \ifstrempty{#2}{%
+    \def\litmusexpgrouping{}%
+  }{% else
+    \begingroup
+      \def\lit@row{& & \multicolumn{#1}{@{}c@{}}{}}%
+      \def\lit@cmids{}%
+      \pgfmathparse{int(1 + 1 + #1 + 1)}%
+      \edef\lit@next@cmid{\pgfmathresult}%
+      \def\lit@skip{%
+        \expandafter\def\expandafter\lit@row\expandafter{\lit@row & \multicolumn{#1}{@{}c@{}}{}}%
+        \pgfmathparse{int(\lit@next@cmid + #1)}%
+        \edef\lit@next@cmid{\pgfmathresult}%
+      }%
+      \def\lit@group[##1/##2]##3\lit@del{%
+        \pgfmathparse{int(#1 * ##2)}%
+        \expandafter\def\expandafter\lit@row\expandafter{\lit@row & \multicolumn}%
+        \expandafter\expandafter\expandafter\def\expandafter\expandafter\expandafter\lit@row\expandafter\expandafter\expandafter{\expandafter\lit@row\expandafter{\pgfmathresult}{@{}c@{}}{##1}}%
+        \pgfmathparse{int(\pgfmathresult + \lit@next@cmid - 1)}%
+        \edef\lit@cmids{\expandonce\lit@cmids\noexpand\cmidrule(lr){\lit@next@cmid - \pgfmathresult}}%
+        \pgfmathparse{int(\pgfmathresult + 1)}%
+        \edef\lit@next@cmid{\pgfmathresult}%
+        \ifstrempty{##3}{}{% else
+          \lit@next##3\lit@del%
+        }%
+      }%
+      \def\lit@next##1##2\lit@del{%
+        \ifstrequal{##1}{-}{%
+          \lit@skip%
+          \ifstrempty{##2}{}{% else
+            \lit@next##2\lit@del%
+          }%
+        }{%
+          \lit@group##1##2\lit@del%
+        }%
+      }%
+      \lit@next#2\lit@del%
+    \ebars\endgroup\def\litmusexpgrouping|{{\expandonce\litmusexpgrouping \expandonce\lit@row \noexpand\\ \expandonce\lit@cmids}}|%
+  }%
+}
+
+\def\lit@core@name#1/#2\lit@del{%
+  \ifstrempty{#2}{%
+    \expandafter\def\expandafter\lit@core@name@\expandafter{\lit@core@name@ #1}%
+  }{%
+    \expandafter\def\expandafter\lit@core@name@\expandafter{\lit@core@name@ #1/}%
+    \lit@core@name#2\lit@del%
+  }%
+}
+
+\def\lit@add@core#1/#2\lit@del{%
+  \edef\lit@columns{\expandonce\lit@columns O}%
+  \ifstrempty{#2}{%
+    \expandafter\def\expandafter\lit@cores\expandafter{\lit@cores & \litmusexphead{#1}}%
+    \ifdefempty{\lit@group}{%
+      \edef\lit@groups{\expandonce\lit@groups -}%
+    }{% else
+      \edef\lit@groups{\expandonce\lit@groups [\expandonce\lit@group/\expandonce\lit@group@c]-}%
+      \def\lit@group{}%
+    }%
+  }{% else
+    \def\lit@core@name@{}%
+    \lit@core@name#2\lit@del%
+    \edef\lit@cores{\expandonce\lit@cores & \noexpand\litmusexphead{\expandonce\lit@core@name@}}%
+    \ifdefstring{\lit@group}{#1}{%
+      \pgfmathparse{int(\lit@group@c + 1)}%
+      \edef\lit@group@c{\pgfmathresult}%
+    }{% else
+      \ifdefempty{\lit@group}{}{% else
+        \edef\lit@groups{\expandonce\lit@groups [\expandonce\lit@group/\expandonce\lit@group@c]}%
+      }%
+      \toggletrue{lit@has@groups}%
+      \def\lit@group{#1}%
+      \def\lit@group@c{1}%
+    }%
+  }%
+}
+
+\newtoggle{lit@exp@dump@next@tabular}
+\edef\lit@exp@dump@tabular@name{\jobname.litexptab.tex}
+
+% '\begin{litmusresults}{<machines>}...\end{litmusresults}' where
+% <machines> is a CSV list of the machines. Machines with multiple kinds
+% of cores should be listed as 'mach/kind1,mach/kind2,...'.
+\newenvironment{litmusresults}[1]{% before
+  \iftoggle{lit@exp@dump@next@tabular}{%
+    \newwrite\lit@exp@dump@tabular@file%
+    \immediate\openout\lit@exp@dump@tabular@file=\lit@exp@dump@tabular@name%
+  }{}%
+  \setcounter{lit@midrule}{1}%
+  \global\togglefalse{lit@need@midrule}%
+  \def\lit@columns{}%
+  \def\lit@groups{}%
+  \def\lit@cores{}%
+  \def\lit@group{}%
+  \def\lit@group@c{0}%
+  \newtoggle{lit@has@groups}%
+  \def\lit@add@core@##1{\lit@add@core##1/\lit@del}%
+  \forcsvlist{\lit@add@core@}{#1}%
+  \ifdefempty{\lit@group}{}{% else
+    \edef\lit@groups{\expandonce\lit@groups [\expandonce\lit@group/\expandonce\lit@group@c]}%
+  }%
+  \edef\lit@temp{%
+    \noexpand\iftoggle{lit@has@groups}{\noexpand\setnextlitmusexpgrouping{\expandonce\lit@groups}}{}%
+    \noexpand\begin{tabular}{@{}llO\expandonce\lit@columns @{}}%
+      \noexpand\toprule%
+      \noexpand\litmusexpgrouping%
+      & Status & \noexpand\litmusexphead{Total} \expandonce\lit@cores \noexpand\\%
+      \noexpand\midrule%
+  }\lit@temp%
+  \iftoggle{lit@exp@dump@next@tabular}{%
+    {\newlinechar=`\^^J%
+      \immediate\write\lit@exp@dump@tabular@file{%
+        \noexpand\begin{tabular}{@{}llO\expandonce\lit@columns @{}}^^J%
+        \space\space \noexpand\toprule^^J%
+        \space\space \expandonce\litmusexpgrouping^^J%
+        \space\space & Status & \noexpand\litmusexphead{Total} \expandonce\lit@cores \noexpand\\^^J%
+        \space\space \noexpand\midrule%
+      }%
+    }%
+  }{}%
+}{% after
+    \bottomrule
+  \end{tabular}%
+  \iftoggle{lit@exp@dump@next@tabular}{%
+    \immediate\write\lit@exp@dump@tabular@file{\space\space \noexpand\bottomrule}%
+    \immediate\write\lit@exp@dump@tabular@file{\noexpand\end{tabular}}%
+    \closeout\lit@exp@dump@tabular@file%
+    \global\togglefalse{lit@exp@dump@next@tabular}%
+  }{}%
+  \def\litmusexpgrouping{}%
+}

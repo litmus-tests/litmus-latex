@@ -1,0 +1,19 @@
+\litmusset{
+  Power/.style={
+    /litmus/listing options/.if defined=then {
+      /litmus/listing options/.prefix={language=Power,}
+    },
+    /litmus/base language,
+    % Generated in pp.ml (pp_brief_write_kind):
+    /litmus/mem access/WX/.code={W\textsubscript{X}},
+    % Generated in pp.ml (pp_brief_read_kind):
+    /litmus/mem access/RX/.code={R\textsubscript{X}},
+    /litmus/isync/.litmus relation=litmusIndigo,
+    /litmus/ctrl+isync/.litmus relation=litmusIndigo,
+    /litmus/sync/.litmus relation=litmusDarkGreen,
+    /litmus/lwsync/.litmus relation=litmusDarkGreen,
+    /litmus/.cd scope={
+      every Power/.try,
+    },
+  },
+}

@@ -1,0 +1,290 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                    %
+%         rmem executable model                                      %
+%                                                                    %
+%   Shaked Flur, University of Cambridge                             %
+%   Jon French, University of Cambridge                              %
+%   Kathryn Gray, University of Cambridge (when this work was done)  %
+%   Robert Norton-Wright, University of Cambridge                    %
+%   Christopher Pulte, University of Cambridge                       %
+%   Susmit Sarkar, University of St Andrews                          %
+%   Peter Sewell, University of Cambridge                            %
+%                                                                    %
+%  This file is copyright 2010-2017 by the authors above.            %
+%                                                                    %
+%  All rights reserved.                                              %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% This library should be loaded using '\usepgflibrary{mykeys}'
+
+\pgfkeys{
+  % #1 - package name
+  % #2 - warning/error message
+  % #3 - help message (as in "Type H <return> for immediate help")
+  /utils/package warning/.code 2 args={\PackageWarning{#1}{#2}},
+  /utils/package error/.code n args={3}{\PackageError{#1}{#2}{#3}},
+}
+
+\pgfkeys{
+  % <key>/.get key parts=<macro>
+  % Defines <macro> to be fully qualified <key>, '<macro>name' to be
+  % the key name of <key> and '<macro>path' to be the path of <key>
+  % (i.e. <macro>path/<macro>name = <macro>).
+  % For example, after '\tikzset{foo/.get key parts=\mykey}' \mykey expands
+  % to '/tikz/foo', \mykeyname expands to 'foo' and \mykeypath expands
+  % to '/tikz'.
+  /handlers/.get key parts/.code={%
+    \edef#1{\pgfkeyscurrentpath}%
+    \edef\pgfkeyscurrentkey{\pgfkeyscurrentpath}%
+    \pgfkeyssplitpath{}%
+    \count@\escapechar \escapechar\m@ne%
+      \expandafter\edef\csname\string#1name\endcsname{\pgfkeyscurrentname}%
+      \expandafter\edef\csname\string#1path\endcsname{\pgfkeyscurrentpath}%
+    \escapechar\count@%
+  }
+}
+
+\pgfkeys{
+  % <path>/.cd scope={<key list>} evaluates <key list> with <path> as
+  % default path.
+  /handlers/.cd scope/.style={
+    \pgfkeyscurrentpath/.get key parts=\myk@key,
+    /utils/exec={\pgfkeys{\myk@key/.cd,#1}},
+  }
+}
+
+\pgfkeys{
+  % <key>/.export to=<path> similar to <path>/<key-name>/.forward to=<key>
+  /handlers/.export to/.style={
+    \pgfkeyscurrentpath/.get key parts=\@myk@key,
+    #1/\@myk@keyname/.estyle={\@myk@key={##1}},
+  }
+}
+
+\pgfkeys{
+  % <key>/.selected=<value> has the effect of <key>/\pgfkeysvalueof{<key>}=<value>
+  % Example:
+  %   foo/.initial=a,
+  %   foo/.selected=hello, % => foo/a=hello
+  %   foo=b,
+  %   foo/.selected=world  % => foo/b=world
+  /handlers/.selected/.style={
+    \pgfkeyscurrentpath/\pgfkeysvalueof{\pgfkeyscurrentpath}={#1},
+  }
+}
+
+\pgfkeys{
+  % <key>/.try selected=<value> has the effect of <key>/\pgfkeysvalueof{<key>}/.try=<value>
+  /handlers/.try selected/.style={
+    \pgfkeyscurrentpath/\pgfkeysvalueof{\pgfkeyscurrentpath}/.try={#1},
+  }
+}
+
+\long\def\myk@ifboolexpe#1 then #2 else #3\par{%
+  \ifboolexpe{#1}{\pgfkeysalso{#2}}{\pgfkeysalso{#3}}%
+}
+\long\def\myk@ifboolexpr#1 then #2 else #3\par{%
+  \ifboolexpr{#1}{\pgfkeysalso{#2}}{\pgfkeysalso{#3}}%
+}
+
+\def\myk@evaluateif#1 then #2 else #3\par{%
+  \pgfmathparse{#1}%
+  \ifdim\pgfmathresult pt=0pt\relax%
+    \pgfkeysalso{#3}%
+  \else%
+    \pgfkeysalso{#2}%
+  \fi%
+}
+
+\pgfkeys{
+  % /utils/ifboolexpe={<expression>} then {<true key list>}[ else {<false key list>}]
+  % Evaluates <expression> using \ifboolexpe and then <true key list>
+  % or <false key list>, according to the result.
+  /utils/ifboolexpe/.code args={#1 then #2#3}{%
+    \ifstrempty{#3}{%
+      \myk@ifboolexpe{#1} then {#2} else {}\par%
+    }{% else
+      \myk@ifboolexpe{#1} then {#2}#3\par%
+    }%
+  },
+  /utils/ifboolexpr/.code args={#1 then #2#3}{%
+    \ifstrempty{#3}{%
+      \myk@ifboolexpr{#1} then {#2} else {}\par%
+    }{% else
+      \myk@ifboolexpr{#1} then {#2}#3\par%
+    }%
+  },
+  % /tikz/evaluate if={<expression>} then {<true key list>}[ else {<false key list>}]
+  % Evaluates <expression> using \pgfmathparse and then, if the result
+  % is different than 0 executes <true key list>, otherwise executes
+  % <false key list>.
+  /tikz/evaluate if/.code args={#1 then #2#3}{%
+    \ifstrempty{#3}{%
+      \myk@evaluateif{#1} then {#2} else {}\par%
+    }{% else
+      \myk@evaluateif{#1} then {#2}#3\par%
+    }%
+  },
+  % For any <key> that was set up as a flag:
+  % '<key>/.if true=then {<true key list>}[ else {<false key list>}]'
+  % '<key>/.if false=then {<true key list>}[ else {<false key list>}]'
+  % evaluate <true key list> or <false key list> according to the flag
+  % (i.e. <key>/.@boolexpe).
+  /handlers/.if true/.code args={then #1#2}{%
+    \edef\myk@key{\pgfkeyscurrentpath}%
+    \pgfkeysifdefined{\myk@key/.@boolexpe}{%
+      \pgfkeysgetvalue{\myk@key/.@boolexpe}{\mky@boolexpe}%
+      \ifstrempty{#2}{%
+        \expandafter\myk@ifboolexpe\expandafter{\mky@boolexpe} then {#1} else {}\par%
+      }{% else
+        \expandafter\myk@ifboolexpe\expandafter{\mky@boolexpe} then {#1}#2\par%
+      }%
+    }{% else
+      \PackageError{pgflibrarymykeys}{'\myk@key' is not a boolean flag}{Did you forget '\myk@key/.is if flag=...'?}%
+    }%
+  },
+  /handlers/.if false/.code args={then #1#2}{
+    \edef\myk@key{\pgfkeyscurrentpath}%
+    \pgfkeysifdefined{\myk@key/.@boolexpe}{%
+      \pgfkeysgetvalue{\myk@key/.@boolexpe}{\mky@boolexpe}%
+      \edef\mky@boolexpe{not (\expandonce\mky@boolexpe)}%
+      \ifstrempty{#2}{%
+        \expandafter\myk@ifboolexpe\expandafter{\mky@boolexpe} then {#1} else {}\par%
+      }{% else
+        \expandafter\myk@ifboolexpe\expandafter{\mky@boolexpe} then {#1}#2\par%
+      }%
+    }{% else
+      \PackageError{pgflibrarymykeys}{'\myk@key' is not a boolean flag}{Did you forget '\myk@key/.is if flag=...'?}%
+    }%
+  },
+  % <key>/.is flag=<true|false> (default true)
+  % Sets up <key> for the '.if true' and '.if false' handlers.
+  % <key> or <key>=true to set the flag to true, and <key>=false to set
+  % it to false.
+  /handlers/.is flag/.style={
+    \pgfkeyscurrentpath/.get key parts=\@myk@key,
+    \@myk@key/.is choice,
+    \@myk@key/.default=true,
+    \@myk@key/true/.estyle={\@myk@key/.@boolexpe/.initial={bool {true}}},
+    \@myk@key/false/.estyle={\@myk@key/.@boolexpe/.initial={bool {false}}},
+    \@myk@key={#1},
+  },
+  % <key>/.is if flag=<TeX-if name>
+  % Similar to the PGF '.is if' but also sets up <key> as a flag.
+  /handlers/.is if flag/.style={
+    \pgfkeyscurrentpath/.get key parts=\myk@key,
+    \myk@key/.is if={#1},
+    \myk@key/.@boolexpe/.initial={bool {#1}},
+  },
+  % <key>/.is global if flag=<TeX-if name>
+  % Similar to '.is if flag' but sets the 'if' globally.
+  /handlers/.is global if flag/.style={
+    \pgfkeyscurrentpath/.get key parts=\myk@key,
+    \myk@key/.is choice,
+    \myk@key/.default=true,
+    \myk@key/true/.code={\global\csname #1true\endcsname},
+    \myk@key/false/.code={\global\csname #1false\endcsname},
+    \myk@key/.@boolexpe/.initial={bool {#1}},
+  },
+  % <key>/.is toggle flag=<etoolbox toggle name>
+  % Similar to '.is if flag' for flags defined with the etoolbox \newtoggle.
+  /handlers/.is toggle flag/.style={
+    \pgfkeyscurrentpath/.get key parts=\myk@key,
+    \myk@key/.is choice,
+    \myk@key/.default=true,
+    \myk@key/true/.code={\toggletrue{#1}},
+    \myk@key/false/.code={\togglefalse{#1}},
+    \myk@key/.@boolexpe/.initial={togl {#1}},
+  },
+  % <key>/.if defined=then {<true key list>}[ else {<false key list>}]
+  % If <key> is defined evaluates <true key list>, otherwise evaluates <false key list>.
+  /handlers/.if defined/.style args={then #1#2}{
+    \pgfkeyscurrentpath/.get key parts=\myk@key,
+    /utils/ifboolexpe={test {\pgfkeysifdefined{\myk@key}}} then {#1}#2,
+  },
+  % <key>/.if defined value={<macro>} then {<true key list>}[ else {<false key list>}]
+  % If <key> is defined, sets <macro> to the value of <key>
+  % and evaluates <true key list>, otherwise evaluates <false key list>.
+  /handlers/.if defined value/.style args={#1 then #2#3}{
+    \pgfkeyscurrentpath/.get key parts=\myk@key,
+    \myk@key/.if defined=then {\myk@key/.get=#1,#2}#3,
+  },
+  % /utils/if no value={<#n>} then {<true keys>}[ else {<false keys>}]
+  % evaluates <true keys> if <#n> is \pgfkeysnovalue, otherwise
+  % evaluates <false keys>.
+  /utils/if no value/.style args={#1 then #2#3}{%
+    /utils/exec={\def\myk@temp{#1}},
+    /utils/ifboolexpe={test {\ifdefequal{\myk@temp}{\pgfkeysnovalue@text}}} then {#2}#3,
+  },
+}
+
+\pgfkeys{
+  % <key>/.try with warning=<value>
+  % Similar to '.try', but when the try fails prints a warning.
+  /handlers/.try with warning/.style={
+    \pgfkeyscurrentpath/.get key parts=\myk@key,
+    \myk@key/.try={#1},
+    /utils/ifboolexpe={not bool {pgfkeyssuccess}} then {%
+      /utils/package warning/.expanded={pgflibrarymykeys}{The key '\myk@key' does not exist},
+    },
+  },
+}
+
+\pgfkeys{
+  % <key>/.get with default={<macro>}{<value>}
+  % Similar to /.get, but if <key> is not defined assignes <value> to
+  % <macro> using \def.
+  /handlers/.get with default/.style 2 args={
+    \pgfkeyscurrentpath/.get key parts=\myk@key,
+    \myk@key/.if defined=then {
+      \myk@key/.get=#1,
+    } else {
+      /utils/exec={\def#1{#2}},
+    },
+  },
+  % <key>/.value of=<another key>
+  % Equivalent to writing '<key>=\pgfkeysvalueof{<another key>}'
+  % which is somewhat like the '.link' handler, only for predefined keys.
+  % NOTE: <another key> must be a fully qualified key name.
+  /handlers/.value of/.style={\pgfkeyscurrentpath=\pgfkeysvalueof{#1}},
+}
+
+\pgfkeys{
+  % <key>/.global store in=<macro>
+  % Similar to '.store in', except that <macro> is defined globally.
+  /handlers/.global store in/.style={
+    \pgfkeyscurrentpath/.code={\gdef#1{##1}},
+  }
+}
+
+\pgfkeys{
+  % <key>/.list append={<value>}
+  % <key>/.list prepend={<value>}
+  % <key>/.list reverse
+  % Assuming the value of <key> is a comma separated list, apply the
+  % selected list operation to it.
+  /handlers/.list append/.style={
+    \pgfkeyscurrentpath/.get key parts=\myk@key,
+    \myk@key/.get=\myk@temp@the@list,
+    /utils/ifboolexpe={test {\ifdefempty{\myk@temp@the@list}}} then {
+      \myk@key={#1}
+    } else {
+      \myk@key/.append={,#1}
+    },
+  },
+  /handlers/.list prepend/.style={
+    \pgfkeyscurrentpath/.get key parts=\myk@key,
+    \myk@key/.get=\myk@temp@the@list,
+    /utils/ifboolexpe={test {\ifdefempty{\myk@temp@the@list}}} then {
+      \myk@key={#1}
+    } else {
+      \myk@key/.prefix={#1,}
+    },
+  },
+  /handlers/.list reverse/.style={
+    \pgfkeyscurrentpath/.get key parts=\myk@key,
+    \myk@key/.get=\myk@temp@the@list,
+    \myk@key=,
+    \myk@key/.list prepend/.list/.expanded={\myk@temp@the@list},
+  }
+}

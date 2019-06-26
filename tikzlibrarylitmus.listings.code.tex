@@ -1,0 +1,39 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                    %
+%         rmem executable model                                      %
+%                                                                    %
+%   Shaked Flur, University of Cambridge                             %
+%   Jon French, University of Cambridge                              %
+%   Kathryn Gray, University of Cambridge (when this work was done)  %
+%   Robert Norton-Wright, University of Cambridge                    %
+%   Christopher Pulte, University of Cambridge                       %
+%   Susmit Sarkar, University of St Andrews                          %
+%   Peter Sewell, University of Cambridge                            %
+%                                                                    %
+%  This file is copyright 2010-2017 by the authors above.            %
+%                                                                    %
+%  All rights reserved.                                              %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% This library should be loaded using '\usetikzlibrary{litmus.listings}'
+
+\RequirePackage{listings}
+
+\litmusset{
+  use listing/.default=,
+  use listing/.style={
+    /litmus/listing options/.initial={#1},
+    /utils/exec={%
+      \def\assem{\@ifnextchar[{\@assem}{\@assem[]}}%
+      \def\lit@internal@assem{\assem}%
+    },
+  },
+}
+
+% NOTE: 'listing options' might include keys like 'basicstyle=\ttfamily',
+% therefore, we should not use \edef in the following code
+\def\@assem[#1]{%
+  \begingroup%
+    \litmusset{listing options/.get=\lit@temp}%
+  \expandafter\endgroup\expandafter\lstinline\expandafter[\lit@temp,#1]%
+}%

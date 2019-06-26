@@ -1,0 +1,48 @@
+\litmusset{
+  RISCV/.style={
+    /litmus/listing options/.if defined=then {
+      /litmus/listing options/.prefix={language=RISCV,}
+    },
+    /litmus/base language,
+    % Generated in pp.ml (pp_brief_write_kind):
+    /litmus/mem access/W.RCpc/.code={W\textsubscript{RCpc}},
+    /litmus/mem access/W.RCsc/.code={W\textsubscript{RCsc}},
+    /litmus/mem access/W.aqrl/.code={W\textsubscript{aqrl}},
+    /litmus/mem access/Wcon/.code={W\textsubscript{con}},
+    /litmus/mem access/Wcon.RCpc/.code={W\textsubscript{con.RCpc}},
+    /litmus/mem access/Wcon.RCsc/.code={W\textsubscript{con.RCsc}},
+    /litmus/mem access/Wcon.aqrl/.code={W\textsubscript{con.aqrl}},
+    % Generated in pp.ml (pp_brief_read_kind):
+    /litmus/mem access/R.RCpc/.code={R\textsubscript{RCpc}},
+    /litmus/mem access/R.RCsc/.code={R\textsubscript{RCsc}},
+    /litmus/mem access/R.aqrl/.code={R\textsubscript{aqrl}},
+    /litmus/mem access/Rres/.code={R\textsubscript{res}},
+    /litmus/mem access/Rres.RCpc/.code={R\textsubscript{res.RCpc}},
+    /litmus/mem access/Rres.RCsc/.code={R\textsubscript{res.RCsc}},
+    /litmus/mem access/Rres.aqrl/.code={R\textsubscript{res.aqrl}},
+    /litmus/fence.i/.litmus relation=litmusIndigo,
+    /litmus/ctrl+fence.i/.litmus relation=litmusIndigo,
+    /litmus/fence rw rw/.litmus relation=litmusDarkGreen,
+      /litmus/fence rw rw/.default={fence rw,rw},
+    /litmus/fence rw r/.litmus relation=litmusDarkGreen,
+      /litmus/fence rw r/.default={fence rw,r},
+    /litmus/fence rw w/.litmus relation=litmusDarkGreen,
+      /litmus/fence rw w/.default={fence rw,w},
+    /litmus/fence r rw/.litmus relation=litmusDarkGreen,
+      /litmus/fence r rw/.default={fence r,rw},
+    /litmus/fence r r/.litmus relation=litmusDarkGreen,
+      /litmus/fence r r/.default={fence r,r},
+    /litmus/fence r w/.litmus relation=litmusDarkGreen,
+      /litmus/fence r w/.default={fence r,w},
+    /litmus/fence w rw/.litmus relation=litmusDarkGreen,
+      /litmus/fence w rw/.default={fence w,rw},
+    /litmus/fence w r/.litmus relation=litmusDarkGreen,
+      /litmus/fence w r/.default={fence w,r},
+    /litmus/fence w w/.litmus relation=litmusDarkGreen,
+      /litmus/fence w w/.default={fence w,w},
+    /litmus/fence.tso/.litmus relation=litmusDarkGreen,
+    /litmus/.cd scope={
+      every RISCV/.try,
+    },
+  },
+}

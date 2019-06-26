@@ -1,0 +1,102 @@
+\lst@definelanguage{RISCV}{
+  sensitive=false,
+  alsoletter={.},
+  morecomment=[l]{//},
+  showstringspaces=false,
+%%% GPRs:
+  morekeywords=[2]{
+    x0,x1,x2,x3,x4,x5,x6,x7,x8,x9,
+    x10,x11,x12,x13,x14,x15,x16,x17,x18,x19,
+    x20,x21,x22,x23,x24,x25,x26,x27,x28,x29,
+    x30,x31,
+    % FP:
+    f0,f1,f2,f3,f4,f5,f6,f7,f8,f9,
+    f10,f11,f12,f13,f14,f15,f16,f17,f18,f19,
+    f20,f21,f22,f23,f24,f25,f26,f27,f28,f29,
+    f30,f31,
+  },
+%%% ABI registers:
+  morekeywords=[3]{
+    zero,ra,sp,gp,tp,fp
+    t0,t1,t2,t3,t4,t5,t6,
+    s0,s1,s2,s3,s4,s5,s6,s7,s8,s9,s10,s11,
+    a0,a1,a2,a3,a4,a5,a6,a7,
+    % FP:
+    ft0,ft1,ft2,ft3,ft4,ft5,ft6,ft7,ft8,ft9,ft10,ft11,
+    fs0,fs1,fs2,fs3,fs4,fs5,fs6,fs7,fs8,fs9,fs10,fs11,
+    fa0,fa1,fa2,fa3,fa4,fa5,fa6,fa7,
+  },
+%%% Regular instructions:
+  morekeywords=[4]{
+    % RV32I:
+    addi,slti,sltiu,andi,ori,xori,
+    slli,srli,srai,
+    lui,auipc,
+    add,slt,sltu,and,or,xor,sll,srl,sub,sra,
+    nop,
+    csrrw,csrrs,csrrc,csrrwi,csrrsi,csrrci,
+    rdcycle,rdcycleh,rdtime,rdtimeh,rdinstret,rdinstreth,
+    % RV64I:
+    addiw,
+    slliw,srliw,sraiw,
+    addw,sllw,srlw,subw,sraw,
+  },
+%%% Memory accesses:
+  morekeywords=[5]{
+    % RV32I:
+    lb,lbu,lh,lhu,lw,
+    sb,sh,sw,
+    % RV64I:
+    ld,lwu,
+    sd,
+    % A:
+    lr.w,lr.w.aq,lr.w.aq.rl,
+    lr.d,lr.d.aq,lr.d.aq.rl,
+    sc.w,sc.w.rl,sc.w.aq.rl,
+    sc.d,sc.d.rl,sc.d.aq.rl,
+    amoswap.w,amoswap.w.aq,amoswap.w.rl,amoswap.w.aq.rl,
+    amoswap.d,amoswap.d.aq,amoswap.d.rl,amoswap.d.aq.rl,
+    amomaxu.w,amomaxu.w.aq,amomaxu.w.rl,amomaxu.w.aq.rl,
+    amomaxu.d,amomaxu.d.aq,amomaxu.d.rl,amomaxu.d.aq.rl,
+    amominu.w,amominu.w.aq,amominu.w.rl,amominu.w.aq.rl,
+    amominu.d,amominu.d.aq,amominu.d.rl,amominu.d.aq.rl,
+    amoadd.w,amoadd.w.aq,amoadd.w.rl,amoadd.w.aq.rl,
+    amoadd.d,amoadd.d.aq,amoadd.d.rl,amoadd.d.aq.rl,
+    amoand.w,amoand.w.aq,amoand.w.rl,amoand.w.aq.rl,
+    amoand.d,amoand.d.aq,amoand.d.rl,amoand.d.aq.rl,
+    amoxor.w,amoxor.w.aq,amoxor.w.rl,amoxor.w.aq.rl,
+    amoxor.d,amoxor.d.aq,amoxor.d.rl,amoxor.d.aq.rl,
+    amomax.w,amomax.w.aq,amomax.w.rl,amomax.w.aq.rl,
+    amomax.d,amomax.d.aq,amomax.d.rl,amomax.d.aq.rl,
+    amomin.w,amomin.w.aq,amomin.w.rl,amomin.w.aq.rl,
+    amomin.d,amomin.d.aq,amomin.d.rl,amomin.d.aq.rl,
+    amoor.w,amoor.w.aq,amoor.w.rl,amoor.w.aq.rl,
+    amoor.d,amoor.d.aq,amoor.d.rl,amoor.d.aq.rl,
+    % future extension:
+    lb.aq,lb.aq.rl,
+    lbu.aq,lbu.aq.rl,
+    lh.aq,lh.aq.rl,
+    lhu.aq,lhu.aq.rl,
+    lw.aq,lw.aq.rl,
+    ld.aq,ld.aq.rl,
+    sb.rl,sb.aq.rl,
+    sh.rl,sh.aq.rl,
+    sw.rl,sw.aq.rl,
+    sd.rl,sd.aq.rl,
+  },
+%%% Barriers:
+  morekeywords=[6]{
+    % RV32I:
+    fence,fence.tso,fence.i,r,w,rw,
+  },
+%%% Branch instructions:
+  morekeywords=[7]{
+    % RV32I:
+    jal,jalr,
+    j,jr,
+    beq,bne,blt,bltu,bge,bgeu,
+    ecall,ebreak,
+  },
+%%% Cache maintenance instructions:
+%   morekeywords=[8]{},
+}

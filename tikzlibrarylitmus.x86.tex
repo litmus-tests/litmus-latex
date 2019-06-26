@@ -1,0 +1,16 @@
+\litmusset{
+  x86/.style={
+    /litmus/listing options/.if defined=then {
+      /litmus/listing options/.prefix={language=x86,}
+    },
+    /litmus/base language,
+    % Generated in pp.ml (pp_brief_write_kind):
+    /litmus/mem access/Wlck/.code={W\textsubscript{lck}},
+    % Generated in pp.ml (pp_brief_read_kind):
+    /litmus/mem access/Rlck/.code={R\textsubscript{lck}},
+    /litmus/MFENCE/.litmus relation=litmusDarkGreen,
+    /litmus/.cd scope={
+      every x86/.try,
+    },
+  },
+}

@@ -1,0 +1,63 @@
+\lst@definelanguage{AArch64}{
+  sensitive=false,
+%   alsodigit={\#},
+  alsoletter={.},
+  morecomment=[l]{//},
+  showstringspaces=false,
+%%% GPRs:
+  morekeywords=[2]{
+    X0,X1,X2,X3,X4,X5,X6,X7,X8,X9,
+    X10,X11,X12,X13,X14,X15,X16,X17,X18,X19,
+    X20,X21,X22,X23,X24,X25,X26,X27,X28,X29,
+    X30,
+    XZR,SP,
+    W0,W1,W2,W3,W4,W5,W6,W7,W8,W9,
+    W10,W11,W12,W13,W14,W15,W16,W17,W18,W19,
+    W20,W21,W22,W23,W24,W25,W26,W27,W28,W29,
+    W30,
+    WZR,WSP,
+  },
+%%% ABI registers:
+%   morekeywords=[3]{...},
+%%% Regular instructions:
+  morekeywords=[4]{
+    adc,sbc,adcs,sbcs,add,sub,adds,subs,adr,adrp,and,ands,eor,orr,bic,bics,eon,orn,asrv,lslv,lsrv,rorv,
+    bfm,sbfm,ubfm,
+    ccmn,ccmp,cmn,cmp,
+    cls,clz,
+    crc32b,crc32h,crc32w,crc32cb,crc32ch,crc32cw,crc32x,crc32cx,
+    csel,csinc,csinv,csneg,cset,csetm,cinc,cinv,cneg,
+    madd,msub,mul,mneg,
+    movk,movn,movz,
+    neg,negs,ngc,ngcs,
+    rbit,rev,rev16,rev32,
+    sdiv,udiv,
+    smaddl,smsubl,umaddl,
+    umsubl,smulh,umulh,smull,umull,
+    sbfiz,ubfiz,sbfx,ubfx,smnegl,umnegl,
+    bfi,bfxil,clrex,extr,hint,mov,mvn,nop,tst,mrs,msr,
+    % these can also be operands:
+    lsl,lsr,asr,ror,
+    uxtb,uxth,uxtw,uxtx,
+    sxtb,sxth,sxtw,sxtx
+  },
+%%% Memory accesses:
+  morekeywords=[5]{
+    ldr,ldrb,ldrh,ldp,ldar,ldarb,ldarh,ldaxp,ldaxr,ldaxrb,ldaxrh,ldxp,ldxr,ldxrb,ldxrh,ldrsb,ldrsh,ldrsw,
+    str,strb,strh,stp,stlr,stlrb,stlrh,stlxp,stlxr,stlxrb,stlxrh,stxp,stxr,stxrb,stxrh,
+    ldtr,ldtrb,ldtrh,ldtrsb,ldtrsh,ldtrsw,ldur,ldurb,ldurh,ldursb,ldursh,ldursw,
+    sttr,sttrb,sttrh,stur,sturb,sturh,
+    ldpsw,
+    prfm,prfum
+  },
+%%% Barriers:
+  morekeywords=[6]{dmb,dsb,isb,st,ld,sy},
+%%% Branch instructions:
+  morekeywords=[7]{b,br,bl,blr,ret,
+    b.eq,b.ne,b.cs,b.hs,b.cc,b.lo,b.mi,b.pl,b.vs,b.vc,b.hi,b.ls,b.ge,
+    b.lt,b.gt,b.le,b.al,b.nv,
+    cbz,cbnz,tbz,tbnz
+  },
+%%% Cache maintenance instructions:
+  morekeywords=[8]{DC,IC,CVAU,IVAU},
+}
