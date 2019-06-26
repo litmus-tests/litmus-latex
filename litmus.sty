@@ -43,12 +43,6 @@
 \immediate\openout\tikzfiglistfile=\jobname.figlist
 \closeout\tikzfiglistfile
 
-% We write to this file litmus tests for which diagrams are needed
-% Line format: "<context>:<arch>/<test name>"
-\newwrite\litmusfigs@file
-\immediate\openout\litmusfigs@file=\jobname.litmusfigs
-% \closeout\litmusfigs@file
-
 \pgfkeys{%
   /litmus options/.is family,
   /litmus options/.unknown/.code={
@@ -674,11 +668,6 @@
     every event box/.append style={outer sep=2pt},
     every events box/.append style={outer sep=1pt},
   },
-  missing file/.style={
-    draw=red, very thick,
-    fill=red!25,
-    font=\tiny\bf, align=left,
-  },
 }
 
 \tikzset{
@@ -717,27 +706,19 @@
     \expandedlitmusname\@name{#2}{#3}{#4}%
     \ifstrempty{#4}{\def\@arch{#2}}{\def\@arch{#4}}%
     \def\arch@name{\@arch/\@name}%
-    \immediate\write\litmusfigs@file{\lit@opt@context:\arch@name}%
     \litmusset{\arch@name/do not extern/.try}%
     \iftoggle{lit@opt@extern}{%
       \tikzsetnextfilename{\lit@opt@context/\arch@name.assem}%
     }{}%
-    \IfFileExists{\arch@name.tikz}{%
-      \inputlitmustable[%
-        \@arch,
-        % This is mostly needed for RV, where 'architecture', as written
-        % to the .state.tex file, is "RISCV" (instead of "RISC-V")
-        architecture/.expanded={\arch{\@arch}},
-        compute assem text width=\arch@name,
-        {\arch@name}/assem/.try with warning,
-        #1,
-      ]{assem}{\arch@name}%
-    }{% else
-      \lit@warning{Missing litmus test file \arch@name.tikz (assem)}%
-      \begin{tikzpicture}%
-        \node[/litmus/missing file] {missing (assem) target: \arch@name.tikz\\source: #2/#3};%
-      \end{tikzpicture}%
-    }%
+    \inputlitmustable[%
+      \@arch,
+      % This is mostly needed for RV, where 'architecture', as written
+      % to the .state.tex file, is "RISCV" (instead of "RISC-V")
+      architecture/.expanded={\arch{\@arch}},
+      compute assem text width=\arch@name,
+      {\arch@name}/assem/.try with warning,
+      #1,
+    ]{assem}{\arch@name}%
   }%
 }
 
@@ -754,23 +735,15 @@
     \expandedlitmusname\@name{#2}{#3}{#4}%
     \ifstrempty{#4}{\def\@arch{#2}}{\def\@arch{#4}}%
     \def\arch@name{\@arch/\@name}%
-    \immediate\write\litmusfigs@file{\lit@opt@context:\arch@name}%
     \litmusset{\arch@name/do not extern/.try}%
     \iftoggle{lit@opt@extern}{%
       \tikzsetnextfilename{\lit@opt@context/\arch@name.events}%
     }{}%
-    \IfFileExists{\arch@name.tikz}{%
-      \inputlitmuspicture[%
-        \@arch,
-        {\arch@name}/events/.try with warning,
-        #1,
-      ]{events}{\arch@name}%
-    }{% else
-      \lit@warning{Missing litmus test file \arch@name.tikz (events)}%
-      \begin{tikzpicture}%
-        \node[/litmus/missing file] {missing (events) target:\arch@name.tikz\\source: #2/#3};%
-      \end{tikzpicture}%
-    }%
+    \inputlitmuspicture[%
+      \@arch,
+      {\arch@name}/events/.try with warning,
+      #1,
+    ]{events}{\arch@name}%
   }%
 }
 
@@ -787,26 +760,18 @@
     \expandedlitmusname\@name{#2}{#3}{#4}%
     \ifstrempty{#4}{\def\@arch{#2}}{\def\@arch{#4}}%
     \def\arch@name{\@arch/\@name}%
-    \immediate\write\litmusfigs@file{\lit@opt@context:\arch@name}%
     \litmusset{\arch@name/do not extern/.try}%
     \iftoggle{lit@opt@extern}{%
       \tikzsetnextfilename{\lit@opt@context/\arch@name.full}%
     }{}%
-    \IfFileExists{\arch@name.tikz}{%
-      \inputlitmustable[%
-        \@arch,
-        % This is mostly needed for RV, where 'architecture', as written
-        % to the .state.tex file, is "RISCV" (instead of "RISC-V")
-        architecture/.expanded={\arch{\@arch}},
-        {\arch@name}/full/.try with warning,
-        #1,
-      ]{full}{\arch@name}%
-    }{% else
-      \lit@warning{Missing litmus test file \arch@name.tikz (full)}%
-      \begin{tikzpicture}%
-        \node[/litmus/missing file] {missing (full) target:\arch@name.tikz\\source: #2/#3};%
-      \end{tikzpicture}%
-    }%
+    \inputlitmustable[%
+      \@arch,
+      % This is mostly needed for RV, where 'architecture', as written
+      % to the .state.tex file, is "RISCV" (instead of "RISC-V")
+      architecture/.expanded={\arch{\@arch}},
+      {\arch@name}/full/.try with warning,
+      #1,
+    ]{full}{\arch@name}%
   }%
 }
 

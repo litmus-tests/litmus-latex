@@ -1355,45 +1355,48 @@
     },
   },
   hw observations box/.code={
-    \begin{scope}[%
-      /litmus/hw observations/.get=\lit@obs,
-      start chain=observations going right,
-      node distance=1pt,
-      /litmus/expected observations/.selected,
-    ]
-      \node[
-        name=hw observations prefix,
-        outer sep=0,
-        node distance=0,
-        node contents={HW observations:},
-        on chain,
-        /litmus/.cd scope={
-          every hw observations prefix/.try,
-        },
-        #1, % Should be positioning
-      ];
-      \foreach \o/\r in \lit@obs
+    \pgfkeysalso{/litmus/hw observations/.get=\lit@obs}%
+    \ifdefempty{\lit@obs}{}{% else
+      \begin{scope}[%
+        /litmus/hw observations/.get=\lit@obs,
+        start chain=observations going right,
+        node distance=1pt,
+        /litmus/expected observations/.selected,
+      ]
         \node[
-%           anchor=base west,
-%           at={(hw observations prefix.base east)},
+          name=hw observations prefix,
+          outer sep=0,
+          node distance=0,
+          node contents={HW observations:},
           on chain,
-          minimum size=0, inner sep=0, outer sep=0,
-          node contents=,
           /litmus/.cd scope={
-            every hw observation/.try,
+            every hw observations prefix/.try,
           },
-          /utils/ifboolexpr={test {\ifdefstring{\r}{0}}} then {
-            /litmus/experimental result=missing,
-          } else {
-            /utils/ifboolexpr={test {\ifdefstring{\o}{0}}} then {
-              /litmus/experimental result=not observed,
-            } else {
-              /litmus/experimental result=observed,
-            },
-          },
-%           /litmus/experimental result/.expand once=\s,
+          #1, % Should be positioning
         ];
-    \end{scope}
+        \foreach \o/\r in \lit@obs
+          \node[
+  %           anchor=base west,
+  %           at={(hw observations prefix.base east)},
+            on chain,
+            minimum size=0, inner sep=0, outer sep=0,
+            node contents=,
+            /litmus/.cd scope={
+              every hw observation/.try,
+            },
+            /utils/ifboolexpr={test {\ifdefstring{\r}{0}}} then {
+              /litmus/experimental result=missing,
+            } else {
+              /utils/ifboolexpr={test {\ifdefstring{\o}{0}}} then {
+                /litmus/experimental result=not observed,
+              } else {
+                /litmus/experimental result=observed,
+              },
+            },
+  %           /litmus/experimental result/.expand once=\s,
+          ];
+      \end{scope}
+    }%
   },
   table construction/.style={
     /litmus/table header={/tikz/above=1pt of threads box, /tikz/anchor=base},
@@ -1572,16 +1575,53 @@
 %   #2 - mode ('events', 'assem' or 'full')
 %   #3 - .tikz file without the suffix
 
+% We write to this file litmus tests for which diagrams are needed
+% Line format: "<context>:<arch>/<test name>"
+\def\lit@opt@context{main}
+\newwrite\litmusfigs@file
+\immediate\openout\litmusfigs@file=\jobname.litmusfigs
+% \closeout\litmusfigs@file
+
+% We have to use this 'if' because putting the code inside \IfFileExists
+% requires arguments in the tikz options to have extra #'s
+\newif\iflit@file@exists
+
+\litmusset{
+  missing file/.style={
+    draw=red, very thick,
+    fill=red!25,
+    font=\tiny\bf, align=left,
+  },
+}
+
 \newcommand{\inputlitmus}[3][]{%
-  \begin{scope}[/litmus/.cd scope={kind={#2},#1}]%
-    \input{#3.tikz}%
-  \end{scope}%
+  \immediate\write\litmusfigs@file{\lit@opt@context:#3}%
+  \IfFileExists{#3.tikz}{\lit@file@existstrue}{\lit@file@existsfalse}
+  \iflit@file@exists%
+    \begin{scope}[/litmus/.cd scope={kind={#2},#1}]%
+      \input{#3.tikz}
+    \end{scope}%
+  \else%
+    \PackageWarning{litmus-tikz-library}{missing file: #3.tikz}%
+    \begin{scope}
+      \node[/litmus/missing file] {??missing .tikz file??};%
+    \end{scope}%
+  \fi%
 }
 
 \newcommand{\inputlitmuspicture}[3][]{%
-  \begin{tikzpicture}[/litmus/.cd scope={every litmus picture/.try,kind={#2},#1}]%
-    \input{#3.tikz}%
-  \end{tikzpicture}%
+  \immediate\write\litmusfigs@file{\lit@opt@context:#3}%
+  \IfFileExists{#3.tikz}{\lit@file@existstrue}{\lit@file@existsfalse}
+  \iflit@file@exists%
+    \begin{tikzpicture}[/litmus/.cd scope={every litmus picture/.try,kind={#2},#1}]%
+      \input{#3.tikz}
+    \end{tikzpicture}%
+  \else%
+    \PackageWarning{litmus-tikz-library}{missing file: #3.tikz}%
+    \begin{tikzpicture}%
+      \node[/litmus/missing file] {??missing .tikz file??};%
+    \end{tikzpicture}%
+  \fi%
 }
 
 \newcommand{\inputlitmustable}[3][]{%
