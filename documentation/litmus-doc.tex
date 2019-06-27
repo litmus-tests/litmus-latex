@@ -1,0 +1,176 @@
+\documentclass[a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[scaled=0.82]{beramono}
+\usepackage[margin=2cm]{geometry}
+
+\setlength\parindent{0pt}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\def\myautoref#1#2#3{\autoref{#1}}
+
+\usepackage[index,hyperref]{litmus}
+\litmuscfg{%
+  % Externalise the litmus figures
+%   extern=false,
+%   strict translation=false,
+  % The default value of the optional argument of \litmus (i.e. the
+  % source arichetecture)
+%   default arch=GEN,
+  % The target architecture of litmus names of \litmus (empty means
+  % same as the source arch)
+%   target arch=,
+  % The target architectures of litmus figures of \litmus (empty means
+  % same as the source arch)
+  target figs={A64,RV,PPC},
+  % Typeset \litmusref
+%   litmus ref=...,% \ref{#1} and gobble the following two arguments
+%   context=main,
+  % Draw a midrule in experimental results tables every 5 lines
+  exp results midrule=5,
+}
+
+\tikzset{
+  % Figures use sans serif
+  node font=\sffamily,
+  % Nice arrow heads
+  >=litmus arrow,
+}
+
+\litmusset{
+  every litmus/.append style={
+    every thread header/.append style={node font=\small\sffamily},
+  },
+  every litmus table/.append style={
+    every state/.append style={state prefix font=\small\sffamily},
+  },
+}
+
+\newcommand{\TikZ}{Ti\textit{k}Z}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\usepackage{hyperref}
+\hypersetup{
+    linkbordercolor={1 1 1},
+    colorlinks=true,
+    linkcolor=violet,
+%     citebordercolor={0.5 1 0.5},
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{document}
+
+\section{Macros}
+\verb|\litmus{<name>}| - adds a figure of the litmus, if one does not
+already exist, typesets the litmus name and hyperlinks it to the
+figure, like this: \litmus{MP}.
+
+\verb|\litmus+{<name>}| - similar to \verb|\litmus{<name>}| except
+that it forces a new figure, even if a previous one already exists.
+
+\verb|\litmus-{<name>}| - similar to \verb|\litmus{<name>}| except
+that it never adds a figure (for forward referencing).
+
+\verb|\litmus*{<name>}| - just typesets the litmus name (without a
+figure or a link), like this: \litmus*{MP}.
+
+\vspace{4ex}
+
+\verb|\litmusref{<name>}| - reference a litmus figure, like this: \litmusref{MP} (the \litmus{MP} litmus figure).
+
+\vspace{4ex}
+
+\section{litmuscfg}
+The followings are options that can be changed by
+\verb|\litmuscfg{<options>}|.
+
+\verb|index| - can only be used in the preamble. Loads the index
+package and generates an index of litmus tests (use
+\verb|\printindex[litmus]| to typeset the index).
+
+\verb|hyperref| - can only be used in the preamble. Loads the hyperref
+package and links litmus names to their figures.
+
+\verb!extern=false|true! - (initially false, default true) can only be
+used in the preamble. Externalise the litmus figures, that is,
+generates a separate pdf for each diagram (once), and then include
+those pdf in the document instead of typesetting them every time the
+document is built.
+
+\verb!strict translation=false|true! - (initially false, default true)
+be strict when translating litmus name between architectures (strict
+will fail if an edge has no mapping, non-strict will use the source
+name of the edge).
+
+\verb|default arch=<arch>| - (initially GEN) the default value of the
+optional argument of \verb|\litmus|.
+For example, \verb|\litmus*{MP+fens}| parses the litmus name as a
+generic (GEN) name and \verb|\litmus*[A64]{MP+dmb.sys}| parses the
+litmus name as an AArch64 name.
+
+\verb|target arch=<arch>| - (initially empty) the target architecture
+of litmus names of \verb|\litmus| (empty means same as the source arch).
+For example
+\verb|\litmuscfg{target arch=PPC}\litmus*[A64]{MP+dmb.sys}|
+will translate the AArch64 name \litmus*[A64]{MP+dmb.sys} to the
+Power name \litmus*[PPC]{MP+syncs}.
+
+\verb|target figs=<archs>| - (initially empty) a CSV of the architectures
+that are to appear in litmus diagrams (empty means same as the source arch).
+
+\verb|litmus ref=<macro>| - (initially equivalent to \verb|\ref{#1}|)
+\verb|<macor>| should take three arguments and typeset a reference to
+a litmus figure. The arguments are: \#1 - label of the litmus figure;
+\#2 - target architecture; \#3 - target name.
+
+\verb|context=<name>| - (initially main) by changing context you can
+include multiple figures of the same litmus test and reference each
+one specifically.
+
+\verb!exp results midrule=none|<n>! - (initially none) determines if a
+midrule should be drawn every \verb|<n>| lines in experimental results
+tables.
+With no argument the option is enabled with the previous value of
+\verb|<n>| (initially 5).
+
+\section{litmus.names.cfg}
+This file defines how litmus names are translated between architectures.
+
+The translation does not change the basic shape name (e.g.\ MP), which
+is the prefix of the name made of anything that is not a lower case
+letter, but not including the last `+' if the prefix ends with one
+(e.g.\ the name of 2+2W+dmb.sys is 2+2W).
+
+The suffix of the name is then split to edges, separated by `+' and `-',
+And each edge is translated according to the mapping.
+
+\verb|\litmusedgetrans{<src>}{<e>}{<trg1>:<e1>,...}| - defines an
+edge mapping from the source architecture \verb|<src>| edge \verb|<e>|
+to the target architecture \verb|<trgn>| edge \verb|<en>| for every
+\verb|n| in the list.
+For example \verb|\litmusedgetrans{GEN}{fen}{A64:dmb.sy,PPC:sync}|.
+
+\verb|\litmusedgetransannot{<src>/<trg>}{<s1>/<t1>,...}| - defines
+a mapping for edge annotations from the source architecture \verb|<src>|
+to the target architecture \verb|<trg>|.
+For example \verb|\litmusedgetransannot{GEN/A64}{p/p,aq/a,rl/l}|.
+
+\verb|\newlitmusnametrans{<src>}{<name>}{<trg>}{<name'>}| - defines a
+special case for the architecture \verb|<src>| litmus \verb|<name>|
+and target architecture \verb|<trg>|.
+For example: \verb|\newlitmusnametrans{GEN}{MP+addrs}{A64}{MP+addrs+V2}|.
+
+\verb|\renewlitmusnametrans{<src>}{<name>}{<trg>}{<name'>}| - similar to
+\verb|\newlitmusnametrans{<src>}{<name>}{<trg>}{<name'>}|.
+
+
+\cleardoublepage
+% \phantomsection
+% \addcontentsline{toc}{chapter}{Index of Litmus Tests}
+\printindex[litmus][Numbers written in bold refer to the page where a
+figure of the litmus test is displayed.]
+
+\end{document}

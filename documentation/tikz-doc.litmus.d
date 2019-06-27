@@ -1,6 +1,6 @@
 # Generated file (see litmus.mk) -- do not edit
 
-# md5sum of "sed 's/[^:]*://' 'build/tikz_doc.litmusfigs' | sort -u"
+# md5sum of "sed 's/[^:]*://' 'build/tikz-doc.litmusfigs' | sort -u"
 LITMUSFIGSMD5 = 06f2fca8c04b6cc317039b6bbeeabc48  -
 
 $(FIGSDIR)/A64/LB+addr+data.tikz $(FIGSDIR)/A64/LB+addr+data.states.tex: AArch64/non-mixed-size/PPO/LB/LB+addr+data.litmus

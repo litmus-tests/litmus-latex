@@ -3,6 +3,7 @@ BUILDDIR ?= build
 LITMUSLATEXDIR ?= ../
 
 PDFLATEX  ?= pdflatex
+MAKEINDEX ?= makeindex
 
 LATEXFLAGS += -output-directory $(BUILDDIR)
 LATEXFLAGS += -file-line-error
@@ -51,7 +52,7 @@ $(FIGSDIR)/A64/LB+addr+data.tikz: STATE = x=1; y=1; 0:X0=1; 1:X0=0;
 # or use a different model:
 $(FIGSDIR)/A64/WRC+addrs.tikz: RMEMMODEL = flowing -topauto true
 
-$(BUILDDIR)/tikz_doc.pdf: tikz_doc.tex $$(LITMUSPREREQ)
+$(BUILDDIR)/tikz-doc.pdf: tikz-doc.tex $$(LITMUSPREREQ)
 	mkdir -p $(dir $@)
 	$(RUNLATEX) $<
 	$(MAKE) $(LITMUS)
@@ -59,10 +60,22 @@ $(BUILDDIR)/tikz_doc.pdf: tikz_doc.tex $$(LITMUSPREREQ)
 	$(MAKE) $(LITMUS)
 	$(call ifneeded,$(RUNLATEX) $<)
 
-all: tikz_doc.pdf
+all: tikz-doc.pdf
 
 #####################################################################
 
+$(BUILDDIR)/litmus-doc.pdf: litmus-doc.tex $$(LITMUSPREREQ)
+	mkdir -p $(dir $@)
+	$(RUNLATEX) $<
+	$(MAKE) $(LITMUS)
+	$(call ifneeded,$(RUNLATEX) $<)
+	$(MAKE) $(LITMUS)
+	$(MAKEINDEX) -o $(BUILDDIR)/litmus-doc.litmus.ind $(BUILDDIR)/litmus-doc.litmus.idx
+	$(call ifneeded,$(RUNLATEX) $<)
+
+all: litmus-doc.pdf
+
+#####################################################################
 all_minimal: minimal.pdf
 all_minimal: minimal.svg
 all_minimal: minimal.ps minimal.eps
@@ -105,8 +118,11 @@ $(BUILDDIR)/minimal-dvisvgm.dvi $(BUILDDIR)/minimal-dvips.dvi: $(BUILDDIR)/minim
 
 clean:
 	rm -rf '$(BUILDDIR)'
+	rm -rf '$(FIGSDIR)'
+	rm -f *.litmus.d
 	rm -f random_seed.dat
-	rm -f tikz_doc.pdf
+	rm -f litmus-doc.pdf
+	rm -f tikz-doc.pdf
 	rm -f minimal.pdf
 	rm -f minimal.svg
 	rm -f minimal.ps
