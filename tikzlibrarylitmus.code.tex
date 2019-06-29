@@ -1233,11 +1233,13 @@
     /litmus/data/.litmus relation=litmusIndigo,
     % Edge with multiple labels
     /litmus/multi/.litmus relation=litmusBlack,
+    /litmus/multi/separator/.store in=\lit@multi@sep,
+    /litmus/multi/separator={,},
     /litmus/append multi label/.code={%
       \pgfkeysgetvalue{/litmus/##1/.@def}{\lit@temp@label@}%
       % Handle inverse edges like 'po^{-1}' (we only look for the ^)
       \def\lit@temp@p####1^####2\lit@term{####1}%
-      \edef\lit@temp@label{\expandonce\lit@temp@label,{\noexpand\color{\lit@temp@p##1^\lit@term\space color}\expandonce\lit@temp@label@}}%
+      \edef\lit@temp@label{\expandonce\lit@temp@label{\expandonce\lit@multi@sep}{\noexpand\color{\lit@temp@p##1^\lit@term\space color}\expandonce\lit@temp@label@}}%
     },
     /litmus/multi'/.style={
       /utils/exec={\def\lit@temp@label{\@gobble}},

@@ -347,8 +347,12 @@ label text=<text> % (no default, initially the edge name (e.g. 'po'))
 every label/.style={...}
 /tikz/<edge name>=<text> % (default: <edge name>)
   % The possible values of <edge name> depend on the loaded architecture.
-  % The following are part of all architectures: po, co, rf, fr, ctrl,
+  % The following edges are part of all architectures: po, co, rf, fr, ctrl,
   % ctrl+addr, addr, data
+multi'={<edge name>, <edge name>, ...} % where <edge names> is a comma separated list of edge names.
+  % A single edge with all the (default) labels of the edges.
+multi/separator={<text>} % (initially ',').
+  % Sets the separator between the labels of a multi-edge.
 every <edge name>/.style={...}
 every <edge name> label/.style={...}
 hide <edge name>
@@ -356,6 +360,7 @@ hide edges={<edge name>, <edge name>, ...} % (no default)
 hide % e.g. '(1-4) isb (1-7)/.style=hide'
 vertical align=<anchor> % (no default, initially \tikztostart of the first edge on which the style was
                         % applied, in the current scope)
+
 \end{tcblisting}
 
 To change the edge color one can use the option:
