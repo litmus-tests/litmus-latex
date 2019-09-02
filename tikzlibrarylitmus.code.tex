@@ -1260,15 +1260,15 @@
 
 \litmusset{
   state prefix font/.initial=,
-  initial state prefix/.initial={Initial state:~},
-  final state prefix/.initial={Final state:~},
+  initial state prefix/.initial={Initial~state:\ },
+  final state prefix/.initial={Final~state:\ },
   final state result/.initial=unknown,
   final state result/unknown/.style={/litmus/.cd scope={every final state unknown/.try}},
   final state result/allowed/.style={/litmus/.cd scope={every final state allowed/.try}},
   final state result/forbidden/.style={/litmus/.cd scope={every final state forbidden/.try}},
   final state allowed/.style={
     /litmus/final state result=allowed,
-    /litmus/final state prefix={Allowed:~},
+    /litmus/final state prefix={Allowed:\ },
     /utils/if no value={#1} then {} else {
       /litmus/final state={#1},
     },
@@ -1276,7 +1276,7 @@
   },
   final state forbidden/.style={%
     /litmus/final state result=forbidden,
-    /litmus/final state prefix={Forbidden:~},
+    /litmus/final state prefix={Forbidden:\ },
     /utils/if no value={#1} then {} else {
       /litmus/final state={#1},
     },
