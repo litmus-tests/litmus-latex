@@ -192,11 +192,24 @@
       }%
     },
     /litmus/memrf/.code 2 args=rf,
+    /litmus/memfr/.code 2 args=fr,
     /litmus/is mixed-size=false,
   },
 }
 
 \litmusset{
+  old-mixed-size/memslices/.code 2 args={%
+    \def\slices@temp{\@gobble}%
+    \foreach \i/\j in {#2} {%
+      \tikzmath{\size = int(\j - \i + 1);}%
+      \ifnum\i=\z@%
+        \xdef\slices@temp{\slices@temp,#1/\size}%
+      \else%
+        \xdef\slices@temp{\slices@temp,#1+\i/\size}%
+      \fi%
+    }%
+    rf\,\slices@temp%
+  },
   old-mixed-size/.style={
     /litmus/memfp/.code n args={3}{%
       \tikzmath{
@@ -207,23 +220,24 @@
         else { print{\addr+\offs/\size}; };
       }%
     },
-    /litmus/memrf/.code 2 args={%
-      \def\memrf@temp{\@gobble}%
-      \foreach \i/\j in {##2} {%
-        \tikzmath{\size = int(\j - \i + 1);}%
-        \ifnum\i=\z@%
-          \xdef\memrf@temp{\memrf@temp,##1/\size}%
-        \else%
-          \xdef\memrf@temp{\memrf@temp,##1+\i/\size}%
-        \fi%
-      }%
-      rf\,\memrf@temp%
-    },
+    /litmus/memrf/.code 2 args={rf\,\pgfkeysalso{/litmus/old-mixed-size/memslices={##1}{##2}}},
+    /litmus/memfr/.code 2 args={fr\,\pgfkeysalso{/litmus/old-mixed-size/memslices={##1}{##2}}},
     /litmus/is mixed-size=true,
   },
 }
 
 \litmusset{
+  mixed-size/memslices/.code 2 args={%
+    \def\slices@temp{\@gobble}%
+    \foreach \i/\j in {#2} {%
+      \ifx\i\j%
+        \xdef\slices@temp{\slices@temp,\i}%
+      \else%
+        \xdef\slices@temp{\slices@temp,\i..\j}%
+      \fi%
+    }%
+    #1[\slices@temp]%
+  },
   mixed-size/.style={
     /litmus/memfp/.code n args={3}{%
       \tikzmath{
@@ -235,17 +249,8 @@
         else { print{\addr[\offs..\i]}; };
       }%
     },
-    /litmus/memrf/.code 2 args={%
-      \def\memrf@temp{\@gobble}%
-      \foreach \i/\j in {##2} {%
-        \ifx\i\j%
-          \xdef\memrf@temp{\memrf@temp,\i}%
-        \else%
-          \xdef\memrf@temp{\memrf@temp,\i..\j}%
-        \fi%
-      }%
-      rf\,##1[\memrf@temp]%
-    },
+    /litmus/memrf/.code 2 args={rf\,\pgfkeysalso{/litmus/mixed-size/memslices={##1}{##2}}},
+    /litmus/memfr/.code 2 args={fr\,\pgfkeysalso{/litmus/mixed-size/memslices={##1}{##2}}},
     /litmus/is mixed-size=true,
   },
 }
@@ -1227,6 +1232,7 @@
       /litmus/hide rf/.append style={/litmus/init/.style=/litmus/hide},
       /litmus/rf'/.style 2 args={/litmus/rf={\litmusset{memrf={##1}{##2}}}},
     /litmus/fr/.litmus relation=litmusOrange,
+      /litmus/fr'/.style 2 args={/litmus/fr={\litmusset{memfr={##1}{##2}}}},
     /litmus/ctrl/.litmus relation=litmusIndigo,
     /litmus/ctrl+addr/.litmus relation=litmusIndigo,
     /litmus/addr/.litmus relation=litmusIndigo,
@@ -1606,7 +1612,7 @@
   \else%
     \PackageWarning{litmus-tikz-library}{missing file: #3.tikz}%
     \begin{scope}
-      \node[/litmus/missing file] {??missing .tikz file??};%
+      \node[/litmus/missing file] {??missing #3.tikz file??};%
     \end{scope}%
   \fi%
 }
@@ -1621,7 +1627,7 @@
   \else%
     \PackageWarning{litmus-tikz-library}{missing file: #3.tikz}%
     \begin{tikzpicture}%
-      \node[/litmus/missing file] {??missing .tikz file??};%
+      \node[/litmus/missing file] {??missing #3.tikz file??};%
     \end{tikzpicture}%
   \fi%
 }
