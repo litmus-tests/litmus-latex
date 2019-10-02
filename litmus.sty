@@ -136,6 +136,9 @@
   target figs/.store in=\lit@opt@targetfigs,
   target figs=,
   targetfigs/.forward to=/litmus options/target figs,
+  figure placement/.store in=\lit@opt@figplacement,
+  figure placement=htb,
+  figureplacement/.forward to=/litmus options/figure placement,
   %
   % Typeset \litmusref. The argument should be a macro that takes
   % the following arguments and typesets a reference:
@@ -831,8 +834,34 @@
 }
 
 \newrobustcmd{\litfig@four}[6]{%
-  \litfig@list{#1}{#2}{#3}{#4,#5,#6}%
+%   \litfig@list{#1}{#2}{#3}{#4,#5,#6}%
+  \ebars\litfig@four@e|{#1}{#2}{#3}{#4}{#5}{#6}|%
 }
+\newrobustcmd{\litfig@four@e}[6]{%
+  {%
+    \expandedlitmusname\@name{#1}{#2}{#3}%
+    \edef\@widthsone{computedwidthof{"#3/\@name"}}%
+    \expandedlitmusname\@name{#1}{#2}{#4}%
+    \edef\@widthsone{\expandonce\@widthsone,computedwidthof{"#4/\@name"}}%
+    %
+    \expandedlitmusname\@name{#1}{#2}{#5}%
+    \edef\@widthstwo{computedwidthof{"#5/\@name"}}%
+    \expandedlitmusname\@name{#1}{#2}{#6}%
+    \edef\@widthstwo{\expandonce\@widthstwo,computedwidthof{"#6/\@name"}}%
+    %
+    \resizebox{\textwidth}{!}{%
+    \litmusevents[threads baseline, GEN from #3/.try]{#1}{#2}{#3}%
+    \begin{tabular}[t]{cc}%
+      \litmusassem[threads baseline,every assem/.append style={text width={max(\@widthsone)}}]{#1}{#2}{#3} &
+      \litmusassem[threads baseline,every assem/.append style={text width={max(\@widthstwo)}}]{#1}{#2}{#5}\\%
+      %
+      \litmusassem[baseline=(table header.north),every assem/.append style={text width={max(\@widthsone)}}]{#1}{#2}{#4} &
+      \litmusassem[baseline=(table header.north),every assem/.append style={text width={max(\@widthstwo)}}]{#1}{#2}{#6}\\%
+    \end{tabular}%
+    }%
+  }%
+}
+
 
 \newrobustcmd{\litfig@five}[7]{%
   \litfig@list{#1}{#2}{#3}{#4,#5,#6,#7}%
@@ -881,7 +910,7 @@
 %   #3: litmus test name (e.g. MP+dmb.sys)
 %   #4: list of target architectures
 %   #5: caption target arch
-\newrobustcmd{\insertlitmusfig}[5][htb]{%
+\newrobustcmd{\insertlitmusfig}[5][\lit@opt@figplacement]{%
   \ebars\insertlitmusfig@e|{#1}{#2}{#3}{#4}{#5}|
 }
 \newrobustcmd{\insertlitmusfig@e}[5]{%
