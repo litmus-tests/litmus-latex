@@ -1065,15 +1065,19 @@
     /litmus/add events edge/.expand once={\lit@keyname={#1}},
   },
   add events edge/.style args={(#1) #2 (#3)=#4}{
+    % in most cases it's ok to put #4 in the edge options below
+    % (after the #2), but this will not work if there is 'disable edge routing'
+    % in side #4, as this key will be evaluated after the routing has
+    % already been done. Hence, the following line:
     (#1) #2 (#3)/.append style={#4},
     /litmus/add to event relations/.append={%
       \ifboolexpr{%
         test {\lit@if@init@event{#1}} and%
         not test {\lit@ifnodeexists{#1}}%
       }{% then
-        \path node[gobble init/.style args={init-##1}{/litmus/init=##1},gobble init=#1] {} edge[/litmus/.cd scope={#2,#4}] (#3);%
+        \path node[gobble init/.style args={init-##1}{/litmus/init=##1},gobble init=#1] {} edge[/litmus/.cd scope={#2}] (#3);%
       }{% else
-          \path (#1) edge[/litmus/.cd scope={#2,#4}] (#3);%
+          \path (#1) edge[/litmus/.cd scope={#2}] (#3);%
       }%
     },
   },
