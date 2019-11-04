@@ -9,6 +9,7 @@
 
 \RequirePackage{etoolbox}
 \RequirePackage{array}
+\RequirePackage{multirow}
 \RequirePackage{xcolor}
 \RequirePackage{colortbl}
 \RequirePackage{listings}
@@ -55,11 +56,12 @@
 \newtoggle{lit@opt@extern}
 \newtoggle{lit@opt@hyperref}
 \newtoggle{lit@opt@stricttrans}
+\newtoggle{lit@opt@append@ref}
 \newtoggle{lit@opt@midrule}% initially false
 \newcounter{lit@opt@midrule@count}
 \setcounter{lit@opt@midrule@count}{5}
 
-\def\lit@opt@ref#1#2#3{\ref{#1}}
+\def\lit@opt@ref#1#2#3{Figure~\ref{#1}}
 
 % Setup package options
 % NOTE: LaTeX removes all spaces from the package options before passing
@@ -147,6 +149,12 @@
   % #3 is set to the target name.
   litmus ref/.code={\let\lit@opt@ref=#1},
   litmusref/.forward to=/litmus options/litmus ref,
+  %
+  % Follows \litmus with the name of the figure where the diagram is,
+  % e.g., "(Figure 1.1)"
+  append litmus ref/.is toggle flag=lit@opt@append@ref,
+  append litmus ref=true,
+  appendlitmusref/.forward to=/litmus options/append litmus ref,
   %
   % The 'context' becomes part of the reference name of the litmus test.
   % This is useful when you want to include the same test multiple times.
@@ -830,7 +838,25 @@
 }
 
 \newrobustcmd{\litfig@three}[5]{%
-  \litfig@list{#1}{#2}{#3}{#4,#5}%
+%   \litfig@list{#1}{#2}{#3}{#4,#5}%
+  \ebars\litfig@three@e|{#1}{#2}{#3}{#4}{#5}|%
+}
+\newrobustcmd{\litfig@three@e}[5]{%
+  {%
+    \expandedlitmusname\@name@three{#1}{#2}{#3}%
+    \expandedlitmusname\@name@four{#1}{#2}{#4}%
+    \edef\@widths{computedwidthof{"#3/\@name@three"},computedwidthof{"#4/\@name@four"}}%
+    %
+    \begin{tabular}[t]{cc}%
+      \litmusevents[threads baseline, GEN from #3/.try]{#1}{#2}{#3} &
+      \litmusset{every assem/.append style={text width={max(\@widths)}}}%
+      \litmusassem[threads baseline]{#1}{#2}{#3}\\
+      %
+      \litmusassem[threads baseline]{#1}{#2}{#5} &
+      \litmusset{every assem/.append style={text width={max(\@widths)}}}%
+      \litmusassem[threads baseline]{#1}{#2}{#4}%
+    \end{tabular}%
+  }%
 }
 
 \newrobustcmd{\litfig@four}[6]{%
@@ -839,25 +865,31 @@
 }
 \newrobustcmd{\litfig@four@e}[6]{%
   {%
-    \expandedlitmusname\@name{#1}{#2}{#3}%
-    \edef\@widthsone{computedwidthof{"#3/\@name"}}%
-    \expandedlitmusname\@name{#1}{#2}{#4}%
-    \edef\@widthsone{\expandonce\@widthsone,computedwidthof{"#4/\@name"}}%
+    \expandedlitmusname\@name@three{#1}{#2}{#3}%
+    \expandedlitmusname\@name@four{#1}{#2}{#4}%
+    \edef\@widthsone{computedwidthof{"#3/\@name@three"},computedwidthof{"#4/\@name@four"}}%
     %
-    \expandedlitmusname\@name{#1}{#2}{#5}%
-    \edef\@widthstwo{computedwidthof{"#5/\@name"}}%
-    \expandedlitmusname\@name{#1}{#2}{#6}%
-    \edef\@widthstwo{\expandonce\@widthstwo,computedwidthof{"#6/\@name"}}%
+    \expandedlitmusname\@name@five{#1}{#2}{#5}%
+    \expandedlitmusname\@name@six{#1}{#2}{#6}%
+    \edef\@widthstwo{computedwidthof{"#5/\@name@five"},computedwidthof{"#6/\@name@six"}}%
     %
     \resizebox{\textwidth}{!}{%
-    \litmusevents[threads baseline, GEN from #3/.try]{#1}{#2}{#3}%
-    \begin{tabular}[t]{cc}%
-      \litmusassem[threads baseline,every assem/.append style={text width={max(\@widthsone)}}]{#1}{#2}{#3} &
-      \litmusassem[threads baseline,every assem/.append style={text width={max(\@widthstwo)}}]{#1}{#2}{#5}\\%
-      %
-      \litmusassem[baseline=(table header.north),every assem/.append style={text width={max(\@widthsone)}}]{#1}{#2}{#4} &
-      \litmusassem[baseline=(table header.north),every assem/.append style={text width={max(\@widthstwo)}}]{#1}{#2}{#6}\\%
-    \end{tabular}%
+%       \litmusevents[threads baseline, GEN from #3/.try]{#1}{#2}{#3}%
+%       \begin{tabular}[t]{cc}%
+%         \litmusassem[threads baseline, every assem/.append style={text width={max(\@widthsone)}}]{#1}{#2}{#3} &
+%         \litmusassem[threads baseline, every assem/.append style={text width={max(\@widthstwo)}}]{#1}{#2}{#5}\\%
+%         %
+%         \litmusassem[baseline=(table header.north), every assem/.append style={text width={max(\@widthsone)}}]{#1}{#2}{#4} &
+%         \litmusassem[baseline=(table header.north), every assem/.append style={text width={max(\@widthstwo)}}]{#1}{#2}{#6}%
+%       \end{tabular}%
+      \begin{tabular}[t]{ccc}%
+        \litmusassem[threads baseline, every assem/.append style={text width={max(\@widthsone)}}]{#1}{#2}{#3} &
+        \multirow[t]{2}{*}{\litmusevents[threads baseline, GEN from #3/.try]{#1}{#2}{#3}} &
+        \litmusassem[threads baseline, every assem/.append style={text width={max(\@widthstwo)}}]{#1}{#2}{#5}\\%
+        %
+        \litmusassem[baseline=(table header.north), every assem/.append style={text width={max(\@widthsone)}}]{#1}{#2}{#4} & &
+        \litmusassem[baseline=(table header.north), every assem/.append style={text width={max(\@widthstwo)}}]{#1}{#2}{#6}%
+      \end{tabular}%
     }%
   }%
 }
@@ -982,11 +1014,11 @@
 % \litmus  - If the figure does not already exist adds a figure and
 %            prints the name with a link to it. The figure architectures
 %            can be set by the package option 'target figs' (stored in
-%            \lit@opt@targetfigs), empty means the same as the source
+%            \lit@opt@targetfigs), empty means the same as the target
 %            architecture (i.e. #1).
 % \litmus+ - Adds a figure and prints the name with a link to it.
 % \litmus- - Prints the name with a link to a pre-existing figure.
-% \litmus* - Prints the name without a figure or a link.
+% \litmus* - Prints the name without adding a figure or a link.
 \newrobustcmd{\@litmusstar}{%
   \textsf{\thelitmusname{\@sourcearch}{\@sourcename}{\@targetarch}}%
   \litmusindex{\@sourcearch}{\@sourcename}{\@targetarch}%
@@ -998,6 +1030,9 @@
   }{%
     \@litmusstar%
   }%
+  \iftoggle{lit@opt@append@ref}{%
+    \ (\@litmusref)%
+  }{}%
 }
 \newrobustcmd{\@litmusplus}{%
   \insertlitmusfig{\@sourcearch}{\@sourcename}{\@targetfigarchs}{\@targetarch}%
@@ -1019,7 +1054,7 @@
   }%
   \expandedlitmusname\@targetname{#1}{#2}{\@targetarch}%
   \edef\@targetfigarchs{%
-    \ifdefempty{\lit@opt@targetfigs}{#1}{\lit@opt@targetfigs}%
+    \ifdefempty{\lit@opt@targetfigs}{\@targetarch}{\lit@opt@targetfigs}%
   }%
   \litmus@args@next%
 }
@@ -1040,7 +1075,14 @@
     \ebars\lit@opt@ref|{\csuse{litmusfig@\lit@opt@context @\@targetarch/\@targetname @label}}{\@targetarch}{\@targetname}|%
 %     \litmuscfg{litmus ref/.expanded={\csuse{litmusfig@\lit@opt@context @\@targetarch/\@targetname @label}}{\@targetarch}{\@targetname}}%
   }{% else
-    \lit@warning{A litmus figure reference is missing,^^Jrun latex again.}%
+    % If \litmus-{<litmus>} is used and <litmus> does not have a figure,
+    % the warning below will be printed to the log of EVERY LITMUS that is
+    % being externalized. When make sees this warning it will re-build
+    % the externalized pdf every time it runs.
+    % Hence, do not print the warning when doing an exteralizing pass!!!
+    \tikzifexternalizing{}{% else
+      \lit@warning{A litmus figure reference is missing,^^Jrun latex again.}%
+    }%
     ??%
   }%
 }

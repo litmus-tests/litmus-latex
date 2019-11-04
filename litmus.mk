@@ -89,6 +89,8 @@ _RMEMFLAGS += -shallow_embedding true
 _RMEMFLAGS += -pp_hex false
 _RMEMFLAGS += -dot_final_ok true -graph_backend tikz
 RMEMFLAGS  := $(_RMEMFLAGS) $(RMEMFLAGS)
+# Additional flags for mixed-size tests
+RMEMFLAGSMIXEDSIZE := -pp_hex true $(RMEMFLAGSMIXEDSIZE)
 
 # Customise rmem for specific tests:
 -include litmustests.mk
@@ -220,9 +222,9 @@ endif
 $(FIGSDIR)/%.tikz $(FIGSDIR)/%.states.tex: RMEMMODEL ?= $($(firstword $(subst /, ,$*))_RMEMMODEL)
 $(FIGSDIR)/%.tikz $(FIGSDIR)/%.states.tex:
 	mkdir -p $(dir $@)
-	$(RMEM) $(RMEMFLAGS) $(if $(STATE),-final_cond 'observed $(STATE)') -model $(RMEMMODEL) -dot_dir $(dir $@) $<
+	$(RMEM) $(RMEMFLAGS) $(if $(findstring /mixed-size/,$<),$(RMEMFLAGSMIXEDSIZE)) $(if $(STATE),-final_cond 'observed $(STATE)') -model $(RMEMMODEL) -dot_dir $(dir $@) $<
 	if [ ! -f '$@' ]; then\
-	  $(RMEM) $(RMEMFLAGS) -model relaxed -dot_dir $(dir $@) $<;\
+	  $(RMEM) $(RMEMFLAGS) $(if $(findstring /mixed-size/,$<),$(RMEMFLAGSMIXEDSIZE)) -model relaxed -dot_dir $(dir $@) $<;\
 	fi
 	@if [ ! -f '$@' ]; then\
 	  echo "Error: rmem did not generate $@, check that the expected state is observable and that the name of the test in the header of $< matches the file name." &&\
