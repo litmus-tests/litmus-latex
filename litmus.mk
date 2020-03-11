@@ -49,6 +49,9 @@
 ## make from $(shell ...), I don't see an elegant way to pass the
 ## target specific variables to the shell/make.
 
+# This is the directory where this makefile is
+LITMUSMKDIR := $(dir $(lastword $(MAKEFILE_LIST)))
+
 # This should be the same as the latex output directory (can be set
 # using the latex argument -output-directory)
 BUILDDIR ?= .
@@ -118,22 +121,23 @@ litmus = _JOBNAME='$(notdir $(basename $1))' $1.rebuild
 # time { n=1000; e=0; while [ "$n" -gt "0" ]; do touch aa; sleep 0.1s; touch bb; env [ bb -nt aa ] || e="$((e+1))"; n="$((n-1))"; done; echo $e; rm -f aa bb; }
 ifneeded = env [ ! $@.rebuild -nt $@ ] || ( $1 )
 
-LITMUSPACKAGESRCS += $(wildcard litmus.sty)
-LITMUSPACKAGESRCS += $(wildcard litmus.names.cfg)
-LITMUSPACKAGESRCS += $(wildcard litmuscusts.tex)
-LITMUSPACKAGESRCS += $(wildcard pgflibrarymykeys.code.tex)
-LITMUSPACKAGESRCS += $(wildcard tikzlibrarylitmus.code.tex)
-LITMUSPACKAGESRCS += $(wildcard tikzlibrarylitmus.listings.code.tex)
-LITMUSPACKAGESRCS += $(wildcard lstlocal.cfg)
-LITMUSPACKAGESRCS += $(wildcard lstlang0.sty)
-LITMUSPACKAGESRCS += $(wildcard tikzlibrarylitmus.aarch64.tex)
-LITMUSPACKAGESRCS += $(wildcard lstlangaarch64.sty)
-LITMUSPACKAGESRCS += $(wildcard tikzlibrarylitmus.power.tex)
-LITMUSPACKAGESRCS += $(wildcard lstlangpower.sty)
-LITMUSPACKAGESRCS += $(wildcard tikzlibrarylitmus.riscv.tex)
-LITMUSPACKAGESRCS += $(wildcard lstlangriscv.sty)
-LITMUSPACKAGESRCS += $(wildcard tikzlibrarylitmus.x86.tex)
-LITMUSPACKAGESRCS += $(wildcard lstlangx86.sty)
+# TODO: FIXME
+# LITMUSPACKAGESRCS += $(wildcard $(LITMUSMKDIR)/litmus.sty)
+# LITMUSPACKAGESRCS += $(wildcard $(LITMUSMKDIR)/litmus.names.cfg)
+# LITMUSPACKAGESRCS += $(wildcard $(LITMUSMKDIR)/litmuscusts.tex)
+# LITMUSPACKAGESRCS += $(wildcard $(LITMUSMKDIR)/pgflibrarymykeys.code.tex)
+# LITMUSPACKAGESRCS += $(wildcard $(LITMUSMKDIR)/tikzlibrarylitmus.code.tex)
+# LITMUSPACKAGESRCS += $(wildcard $(LITMUSMKDIR)/tikzlibrarylitmus.listings.code.tex)
+# LITMUSPACKAGESRCS += $(wildcard $(LITMUSMKDIR)/lstlocal.cfg)
+# LITMUSPACKAGESRCS += $(wildcard $(LITMUSMKDIR)/lstlang0.sty)
+# LITMUSPACKAGESRCS += $(wildcard $(LITMUSMKDIR)/tikzlibrarylitmus.aarch64.tex)
+# LITMUSPACKAGESRCS += $(wildcard $(LITMUSMKDIR)/lstlangaarch64.sty)
+# LITMUSPACKAGESRCS += $(wildcard $(LITMUSMKDIR)/tikzlibrarylitmus.power.tex)
+# LITMUSPACKAGESRCS += $(wildcard $(LITMUSMKDIR)/lstlangpower.sty)
+# LITMUSPACKAGESRCS += $(wildcard $(LITMUSMKDIR)/tikzlibrarylitmus.riscv.tex)
+# LITMUSPACKAGESRCS += $(wildcard $(LITMUSMKDIR)/lstlangriscv.sty)
+# LITMUSPACKAGESRCS += $(wildcard $(LITMUSMKDIR)/tikzlibrarylitmus.x86.tex)
+# LITMUSPACKAGESRCS += $(wildcard $(LITMUSMKDIR)/lstlangx86.sty)
 
 # Use $$(LITMUSPREREQ) when .SECONDEXPANSION is enabled,
 # use $(call litmusprereq,<target>) otherwise.

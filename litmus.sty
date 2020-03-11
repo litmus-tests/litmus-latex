@@ -39,7 +39,8 @@
   \fi%
 }
 
-% Make sure \jobname.figlist is empty so we do not build old externals
+% Make sure \jobname.figlist (see the TikZ library external) is empty
+% so we do not build old externals
 \newwrite\tikzfiglistfile
 \immediate\openout\tikzfiglistfile=\jobname.figlist
 \closeout\tikzfiglistfile
@@ -57,7 +58,7 @@
 \newtoggle{lit@opt@hyperref}
 \newtoggle{lit@opt@stricttrans}
 \newtoggle{lit@opt@append@ref}
-\newtoggle{lit@opt@midrule}% initially false
+\newtoggle{lit@opt@midrule}
 \newcounter{lit@opt@midrule@count}
 \setcounter{lit@opt@midrule@count}{5}
 
@@ -169,21 +170,17 @@
   %                              <n> is the value that was set last
   %                              (initialy 5)
   exp results midrule/.style={
-    /utils/if no value={#1} then {
-      /utils/exec={\toggletrue{lit@opt@midrule}},
-    } else {
-      /utils/exec={\def\lit@temp{#1}},
-      /litmus options/@exp results midrule=#1,
-    },
+    @exp results midrule/.default/.expanded={\arabic{lit@opt@midrule@count}},
+    @exp results midrule=#1,
+  },
+  @exp results midrule/.is choice with no match,
+  @exp results midrule/none/.code={\togglefalse{lit@opt@midrule}},
+  @exp results midrule/0/.code={\togglefalse{lit@opt@midrule}},
+  @exp results midrule/.no match/.code={%
+    \toggletrue{lit@opt@midrule}%
+    \setcounter{lit@opt@midrule@count}{#1}%
   },
   expresultsmidrule/.forward to=/litmus options/exp results midrule,
-  @exp results midrule/.is choice,
-  @exp results midrule/none/.code=\togglefalse{lit@opt@midrule},
-  @exp results midrule/0/.code=\togglefalse{lit@opt@midrule},
-  @exp results midrule/.unknown/.code={%
-    \toggletrue{lit@opt@midrule}%
-    \setcounter{lit@opt@midrule@count}{\lit@temp}%
-  },
 }
 
 \ProcessPgfPackageOptions{/litmus options}

@@ -49,7 +49,7 @@
   % default path.
   /handlers/.cd scope/.style={
     \pgfkeyscurrentpath/.get key parts=\myk@key,
-    /utils/exec={\pgfkeys{\myk@key/.cd,#1}},
+    /utils/exec={\expandafter\pgfqkeys\expandafter{\myk@key}{#1}},
   }
 }
 
@@ -77,6 +77,19 @@
   % <key>/.try selected=<value> has the effect of <key>/\pgfkeysvalueof{<key>}/.try=<value>
   /handlers/.try selected/.style={
     \pgfkeyscurrentpath/\pgfkeysvalueof{\pgfkeyscurrentpath}/.try={#1},
+  },
+  % '<key>/.is choice with no match' is the same as '<key>/.is choice'
+  % with the addition that if '<key>=<value>' is called and '<key>/<value>'
+  % is not set, '<key>/.no match=<value>' is called.
+  /handlers/.is choice with no match/.style={
+    \pgfkeyscurrentpath/.get key parts=\@myk@key,
+    \@myk@key/.is choice,
+    \@myk@key/.unknown/.ecode={%
+      \noexpand\let\noexpand\@unknown@name=\noexpand\pgfkeyscurrentname%
+      \noexpand\pgfkeysalso{%
+        \@myk@key/.no match/.expand once=\noexpand\@unknown@name,%
+      }%
+    },
   }
 }
 
@@ -133,11 +146,11 @@
   /handlers/.if true/.code args={then #1#2}{%
     \edef\myk@key{\pgfkeyscurrentpath}%
     \pgfkeysifdefined{\myk@key/.@boolexpe}{%
-      \pgfkeysgetvalue{\myk@key/.@boolexpe}{\mky@boolexpe}%
+      \pgfkeysgetvalue{\myk@key/.@boolexpe}{\myk@boolexpe}%
       \ifstrempty{#2}{%
-        \expandafter\myk@ifboolexpe\expandafter{\mky@boolexpe} then {#1} else {}\par%
+        \expandafter\myk@ifboolexpe\expandafter{\myk@boolexpe} then {#1} else {}\par%
       }{% else
-        \expandafter\myk@ifboolexpe\expandafter{\mky@boolexpe} then {#1}#2\par%
+        \expandafter\myk@ifboolexpe\expandafter{\myk@boolexpe} then {#1}#2\par%
       }%
     }{% else
       \PackageError{pgflibrarymykeys}{'\myk@key' is not a boolean flag}{Did you forget '\myk@key/.is if flag=...'?}%
@@ -146,12 +159,12 @@
   /handlers/.if false/.code args={then #1#2}{
     \edef\myk@key{\pgfkeyscurrentpath}%
     \pgfkeysifdefined{\myk@key/.@boolexpe}{%
-      \pgfkeysgetvalue{\myk@key/.@boolexpe}{\mky@boolexpe}%
-      \edef\mky@boolexpe{not (\expandonce\mky@boolexpe)}%
+      \pgfkeysgetvalue{\myk@key/.@boolexpe}{\myk@boolexpe}%
+      \edef\myk@boolexpe{not (\expandonce\myk@boolexpe)}%
       \ifstrempty{#2}{%
-        \expandafter\myk@ifboolexpe\expandafter{\mky@boolexpe} then {#1} else {}\par%
+        \expandafter\myk@ifboolexpe\expandafter{\myk@boolexpe} then {#1} else {}\par%
       }{% else
-        \expandafter\myk@ifboolexpe\expandafter{\mky@boolexpe} then {#1}#2\par%
+        \expandafter\myk@ifboolexpe\expandafter{\myk@boolexpe} then {#1}#2\par%
       }%
     }{% else
       \PackageError{pgflibrarymykeys}{'\myk@key' is not a boolean flag}{Did you forget '\myk@key/.is if flag=...'?}%
@@ -163,28 +176,32 @@
   % it to false.
   /handlers/.is flag/.style={
     \pgfkeyscurrentpath/.get key parts=\@myk@key,
+    \@myk@key/.@boolexpe/.initial=,
+    \@myk@key/true/.estyle={\@myk@key/.@boolexpe={bool {true}}},
+    \@myk@key/false/.estyle={\@myk@key/.@boolexpe={bool {false}}},
     \@myk@key/.is choice,
     \@myk@key/.default=true,
-    \@myk@key/true/.estyle={\@myk@key/.@boolexpe/.initial={bool {true}}},
-    \@myk@key/false/.estyle={\@myk@key/.@boolexpe/.initial={bool {false}}},
     \@myk@key={#1},
   },
   % <key>/.is if flag=<TeX-if name>
   % Similar to the PGF '.is if' but also sets up <key> as a flag.
   /handlers/.is if flag/.style={
     \pgfkeyscurrentpath/.get key parts=\myk@key,
-    \myk@key/.is if={#1},
     \myk@key/.@boolexpe/.initial={bool {#1}},
+    \myk@key/.is if={#1},
   },
   % <key>/.is global if flag=<TeX-if name>
   % Similar to '.is if flag' but sets the 'if' globally.
   /handlers/.is global if flag/.style={
     \pgfkeyscurrentpath/.get key parts=\myk@key,
-    \myk@key/.is choice,
-    \myk@key/.default=true,
+    \myk@key/.@boolexpe/.initial={bool {#1}},
     \myk@key/true/.code={\global\csname #1true\endcsname},
     \myk@key/false/.code={\global\csname #1false\endcsname},
-    \myk@key/.@boolexpe/.initial={bool {#1}},
+    \myk@key/.no match/.estyle={
+      /errors/boolean expected={\csname myk@key\endcsname}{##1},
+    },
+    \myk@key/.is choice with no match,
+    \myk@key/.default=true,
   },
   % <key>/.is toggle flag=<etoolbox toggle name>
   % Similar to '.is if flag' for flags defined with the etoolbox \newtoggle.
