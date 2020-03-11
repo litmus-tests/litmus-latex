@@ -1077,10 +1077,14 @@
     % being externalized. When make sees this warning it will re-build
     % the externalized pdf every time it runs.
     % Hence, do not print the warning when doing an exteralizing pass!!!
-    \tikzifexternalizing{}{% else
+    \ifdef{\tikzifexternalizing}{%
+      \tikzifexternalizing{}{% else
+        \lit@warning{A litmus figure reference is missing,^^Jrun latex again.}%
+      }%
+      ??%
+    }{% else
       \lit@warning{A litmus figure reference is missing,^^Jrun latex again.}%
     }%
-    ??%
   }%
 }
 
