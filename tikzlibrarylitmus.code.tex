@@ -1449,6 +1449,7 @@
 }
 \litmusset{
   litmus table/.style n args={4}{
+    /litmus/.cd scope={every litmus table/.try},
     /litmus/litmus name/.initial={#1},
     /litmus/architecture/.initial={#2},
 %     /litmus/rmem model/.initial={#??},

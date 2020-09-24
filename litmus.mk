@@ -110,7 +110,7 @@ _FORCEBUILD:
 .PHONY: _FORCEBUILD
 
 LITMUS = $(call litmus,$@)
-litmus = _JOBNAME='$(notdir $(basename $1))' $1.rebuild
+litmus = _JOBNAME='$(notdir $(basename $1))' _JOBTARGET='$1' $1.rebuild
 
 # $(call ifneeded,<cmd>) in a recipe will run <cmd> iff $@.rebuild
 # exists and is newer than $@
@@ -162,12 +162,12 @@ ifneq "$(_JOBNAME)" ""
 ## Everything below this line depends on _JOBNAME being set
 
 # This is the target '$(MAKE) $(LITMUS)' builds:
-$(BUILDDIR)/$(_JOBNAME).pdf.rebuild: $(FIGSDIR)/$(_JOBNAME).tikz_figures.sentinel
-$(BUILDDIR)/$(_JOBNAME).pdf.rebuild: $(BUILDDIR)/$(_JOBNAME)-externals/sentinel
-$(BUILDDIR)/$(_JOBNAME).pdf.rebuild: $(FIGSDIR)/$(_JOBNAME).hw-tables.sentinel
+$(_JOBTARGET).rebuild: $(FIGSDIR)/$(_JOBNAME).tikz_figures.sentinel
+$(_JOBTARGET).rebuild: $(BUILDDIR)/$(_JOBNAME)-externals/sentinel
+$(_JOBTARGET).rebuild: $(FIGSDIR)/$(_JOBNAME).hw-tables.sentinel
 # tikzlibrarylitmus.code.tex prints the warning "run latex again." if
 # latex needs to be run again because of 'computed assem width'
-$(BUILDDIR)/$(_JOBNAME).pdf.rebuild: $(shell ! grep -q '^run latex again.' $(BUILDDIR)/$(_JOBNAME).log 2>/dev/null || echo _FORCEBUILD)
+$(_JOBTARGET).rebuild: $(shell ! grep -q '^run latex again.' $(BUILDDIR)/$(_JOBNAME).log 2>/dev/null || echo _FORCEBUILD)
 	touch $@
 
 # If there is no rmem we don't want dependencies that will trigger rmem

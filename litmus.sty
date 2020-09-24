@@ -624,13 +624,13 @@
     every node/.append style={node font=\sffamily},
   },
   every litmus table/.append style={
+    every final state allowed/.style={fill=green!15},
+    every final state forbidden/.style={fill=red!15},
     every state/.append style={
       state prefix font=\normalsize\sffamily,
       node font=\footnotesize\ttfamily,
 %       inner sep=1pt,
     },
-    every final state allowed/.style={fill=green!15},
-    every final state forbidden/.style={fill=red!15},
     every hw observations prefix/.style={node font=\footnotesize\sffamily},
     every hw observation/.style={node font=\footnotesize\sffamily},
     expected observations allowed/.style={
