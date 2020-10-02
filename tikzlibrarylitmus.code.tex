@@ -605,19 +605,7 @@
       /utils/package warning={litmus-tikz-library}{'compute assem text width' expects a unique identifier, '#1' was already used.},
     } else {
       /utils/exec={\csgdef{#1@litmusinstructionswidths@uid}{true}},
-      /pgf/declare function={
-        computedwidth()=computedwidthof("#1");
-      },
-      /utils/ifboolexpe={test {\ifcsdef{#1@litmusinstructionswidths}}} then {
-        % Width has been previously computed, saved to the .aux file and
-        % loaded. Set 'text width' if it has not been set manually.
-        /utils/exec={\lit@auxout@comtextwidth{#1}{\csuse{#1@litmusinstructionswidths}}},
-        /litmus/computed text width/.style={
-          /utils/ifboolexpe={test {\ifdefempty{\tikz@text@width}}} then {
-            /tikz/text width=computedwidth,
-          },
-        },
-      } else {
+      /utils/ifboolexpe={not test {\ifcsdef{#1@litmusinstructionswidths}}} then {
         % Width has not been computed in a previous run, compute it now
         % and save to the .aux file
         %%% NOTE: ^^J is a line-break, litmus.mk is looking for '^run latex again.'
@@ -640,6 +628,21 @@
             };
           }
           \lit@auxout@comtextwidth{#1}{\lit@temp@widths}
+        },
+      },
+    },
+    % The following is outside the else because if the figure appears more than
+    % once maybe we should use the same width (e.g. multiple slides in beamer)
+    /pgf/declare function={
+      computedwidth()=computedwidthof("#1");
+    },
+    /utils/ifboolexpe={test {\ifcsdef{#1@litmusinstructionswidths}}} then {
+      % Width has been previously computed, saved to the .aux file and
+      % loaded. Set 'text width' if it has not been set manually.
+      /utils/exec={\lit@auxout@comtextwidth{#1}{\csuse{#1@litmusinstructionswidths}}},
+      /litmus/computed text width/.style={
+        /utils/ifboolexpe={test {\ifdefempty{\tikz@text@width}}} then {
+          /tikz/text width=computedwidth,
         },
       },
     },
@@ -772,29 +775,29 @@
     \pgfkeyscurrentpath/.get key parts=\lit@key,
     /tikz/\lit@keyname/.pic/.expanded={
       \noexpand\path[pic actions]
-        { [ /litmus/eiids order/.initial=,
-            /litmus/#1,
-            /litmus/events={\lit@keyname},
-            /litmus/eiids order/.get=\noexpand\lit@temp@eiids,
-            /litmus/event nodes/.initial=,
-            /litmus/add event node/.style={/litmus/event nodes/.append={node[/litmus/########1]}},
-            /litmus/add event node/.list/.expanded=\noexpand\lit@temp@eiids,
-          ]
-          \noexpand\pgfkeysvalueof{/litmus/event nodes}
-        }
-        node[/litmus/events box={\lit@keyname}] (\lit@keyname) {};
+                    { [ /litmus/eiids order/.initial=,
+                        /litmus/#1,
+                        /litmus/events={\lit@keyname},
+                        /litmus/eiids order/.get=\noexpand\lit@temp@eiids,
+                        /litmus/event nodes/.initial=,
+                        /litmus/add event node/.style={/litmus/event nodes/.append={node[/litmus/########1]}},
+                        /litmus/add event node/.list/.expanded=\noexpand\lit@temp@eiids,
+                      ]
+                      \noexpand\pgfkeysvalueof{/litmus/event nodes}
+                    }
+                    node[/litmus/events box={\lit@keyname}] (\lit@keyname) {};
     },
     % The following .pic is used when we collect the eiids, it is not
     % used to draw anything.
     /tikz/\lit@keyname-eiids/.pic/.expanded={
       \noexpand\path
-        { [ /litmus/eiids order/.initial=,
-            /litmus/#1,
-            /litmus/events={\lit@keyname},
-            /litmus/eiids order/.get=\noexpand\lit@temp@eiids,
-            /utils/exec={\noexpand\xdef\noexpand\lit@eiids{\noexpand\lit@temp@eiids}},
-          ]
-        } ;
+          { [ /litmus/eiids order/.initial=,
+              /litmus/#1,
+              /litmus/events={\lit@keyname},
+              /litmus/eiids order/.get=\noexpand\lit@temp@eiids,
+              /utils/exec={\noexpand\xdef\noexpand\lit@eiids{\noexpand\lit@temp@eiids}},
+            ]
+          } ;
     },
   },
 }
@@ -878,8 +881,8 @@
     },
   },
   event/.prefix style={/tikz/anchor=base west},
-      % this has to be prefixed so that the 'anchor' of 'going' can
-      % take precedence (for all nodes except the first one on the chain)
+  % this has to be prefixed so that the 'anchor' of 'going' can
+  % take precedence (for all nodes except the first one on the chain)
   init/.style={
     /tikz/name=init-#1,
     /tikz/circle,
@@ -975,7 +978,7 @@
     \edef\lit@temp@exval{\pgfkeysifdefined{/litmus/#1-expected}{\pgfkeysvalueof{/litmus/#1-expected}}{#2}}
     \edef\lit@temp@val{#2}
     \ifx\lit@temp@exval\lit@temp@val\else
-      \PackageError{litmus-tikz-library}{'#1' does not match the expected value (\lit@temp@exval\space <> \lit@temp@val)}{}
+    \PackageError{litmus-tikz-library}{'#1' does not match the expected value (\lit@temp@exval\space <> \lit@temp@val)}{}
     \fi
   },
   mem event/.style args={#1:#2 #3+#4/#5=#6}{
@@ -1077,7 +1080,7 @@
       }{% then
         \path node[gobble init/.style args={init-##1}{/litmus/init=##1},gobble init=#1] {} edge[/litmus/.cd scope={#2}] (#3);%
       }{% else
-          \path (#1) edge[/litmus/.cd scope={#2}] (#3);%
+        \path (#1) edge[/litmus/.cd scope={#2}] (#3);%
       }%
     },
   },
@@ -1233,10 +1236,10 @@
     /litmus/po/.litmus relation=litmusBlack,
     /litmus/co/.litmus relation=litmusBrown,
     /litmus/rf/.litmus relation=litmusRed,
-      /litmus/hide rf/.append style={/litmus/init/.style=/litmus/hide},
-      /litmus/rf'/.style 2 args={/litmus/rf={\litmusset{memrf={##1}{##2}}}},
+    /litmus/hide rf/.append style={/litmus/init/.style=/litmus/hide},
+    /litmus/rf'/.style 2 args={/litmus/rf={\litmusset{memrf={##1}{##2}}}},
     /litmus/fr/.litmus relation=litmusOrange,
-      /litmus/fr'/.style 2 args={/litmus/fr={\litmusset{memfr={##1}{##2}}}},
+    /litmus/fr'/.style 2 args={/litmus/fr={\litmusset{memfr={##1}{##2}}}},
     /litmus/ctrl/.litmus relation=litmusIndigo,
     /litmus/ctrl+addr/.litmus relation=litmusIndigo,
     /litmus/addr/.litmus relation=litmusIndigo,
@@ -1343,8 +1346,9 @@
       #1, % Should be positioning
     ];
   },
-%   \TODO{change obs to Y,N and - in san serif, try \footnote, add colors to match the tables}
+  %   \TODO{change obs to Y,N and - in san serif, try \footnote, add colors to match the tables}
   expected observations/.initial=unknown,
+  expected observations/unknown/.style={/litmus/.cd scope={expected observations unknown/.try}},
   expected observations/allowed/.style={/litmus/.cd scope={expected observations allowed/.try}},
   expected observations/forbidden/.style={/litmus/.cd scope={expected observations forbidden/.try}},
   experimental result/.is choice,
