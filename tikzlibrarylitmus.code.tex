@@ -1120,6 +1120,8 @@
   }, % 'to path=' affects 'vertical align' (the first node changes)
   hide edge/.style={/litmus/hide #1},
   hide edges/.style={/litmus/hide edge/.list={#1}},
+  unhide edge/.style={/litmus/unhide #1},
+  unhide edges/.style={/litmus/unhide edge/.list={#1}},
 }
 
 \litmusset{%
@@ -1223,6 +1225,7 @@
       },
     },
     /litmus/hide \@lit@keyname/.estyle={\@lit@key/.style={/litmus/hide}},
+    /litmus/unhide \@lit@keyname/.estyle={\@lit@key/.litmus relation=#1},
     % Add an inverse edge (not a real edge, just a wrapper that adds
     % \textsuperscript{-1} to the default label)
     \@lit@key^{-1}/.default/.expanded={\expandonce\@lit@keyname\noexpand\textsuperscript{-1}},
