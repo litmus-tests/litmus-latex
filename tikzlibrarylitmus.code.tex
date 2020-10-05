@@ -1118,10 +1118,6 @@
     /tikz/text width=0, /tikz/inner sep=0, /tikz/outer sep=0,
     /tikz/minimum size=0,
   }, % 'to path=' affects 'vertical align' (the first node changes)
-  hide edge/.style={/litmus/hide #1},
-  hide edges/.style={/litmus/hide edge/.list={#1}},
-  unhide edge/.style={/litmus/unhide #1},
-  unhide edges/.style={/litmus/unhide edge/.list={#1}},
 }
 
 \litmusset{%
@@ -1267,6 +1263,10 @@
       every litmus base language/.try,
     },
   },
+  hide edge/.style={/litmus/hide #1},
+  hide edges/.style={/litmus/hide edge/.list={#1}},
+  unhide edge/.style={/litmus/unhide #1},
+  unhide edges/.style={/litmus/unhide edge/.list={#1}},
 }
 
 \input{tikzlibrarylitmus.aarch64}
