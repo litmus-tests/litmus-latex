@@ -323,10 +323,17 @@ $(BUILDDIR)/$(_JOBNAME)-externals/sentinel: $(EXTERNALS)
 	mkdir -p $(dir $@)
 	touch $@
 
+LATEXSOURCE ?= _JOBNAME
 define gen-external-pdf =
 	mkdir -p $(dir $@)
 	rm -f $@
-	-$(PDFLATEX) $(LATEXFLAGS) -jobname "$(patsubst $(BUILDDIR)/%,%,$(@:.pdf=))" "\def\tikzexternalrealjob{$(_JOBNAME)}\input{$(_JOBNAME)}"
+# Some packages (e.g. beamer) write and read auxiliary files (e.g. \jobname.vrb
+# for fragile frames), this creates unwanted interference between multiple runs
+# (as in make -j2) as they all write to the same file. To fix that we set
+# \tikzexternalrealjob to a unique value, and pass the real jobname in \litmusexternaljobname
+# We also copy jobname.aux to the <fake>_job.aux so width information can be read from it.
+	-cp $(BUILDDIR)/$(_JOBNAME).aux $(@:.pdf=)_job.aux
+	-$(PDFLATEX) $(LATEXFLAGS) -jobname "$(patsubst $(BUILDDIR)/%,%,$(@:.pdf=))" "\def\tikzexternalrealjob{$(@:.pdf=)_job}\def\litmusexternaljobname{$(_JOBNAME)}\input{$(LATEXSOURCE)}"
 	@[ -f '$@' ] || { echo "** Error: failed to build an externalized TikZ picture, see $(@:.pdf=.log)"; exit 1; }
 endef
 

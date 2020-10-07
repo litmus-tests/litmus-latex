@@ -95,14 +95,15 @@
         \tikzexternalize[%
           mode=list and make,
           only named=true,
-          prefix=\jobname-externals/,
+          % See litmus.mk for explanation for \litmusexternaljobname
+          prefix/.expanded={\ifdefined\litmusexternaljobname\litmusexternaljobname\else\noexpand\jobname\fi-externals/},
           up to date check=simple,
         ] % activate!
         \pgfkeys{%
           % The initial value is \pgfimage{#1} and that seems to not look
           % for files in TEXTINPUTS.
           % The double grouping is needed to handle names with '.'
-          /pgf/images/include external/.code={\includegraphics{{{##1}}}},
+          %% /pgf/images/include external/.code={\includegraphics{{{##1}}}},
         }%
       }{% else
         % We are inside the document environment
@@ -184,6 +185,18 @@
 }
 
 \ProcessPgfPackageOptions{/litmus options}
+
+
+% Beamer overlays cause the same picture to be externalize multiple
+% times with the same name, and that messes up with the write out of
+% the computed width. When the first instance is externalized it sets
+% the if below to true, which prevents from the following instances
+% from being externalized in the same run.
+% Note that in the run where the externalized pictures are embeded in
+% the final pdf this if will always be false because the pgf keys of
+% the pictures are not evaluated (the pictures are pdfs).
+\newif\iflit@externalized\lit@externalizedfalse
+\litmusset{picture externalized/.is global if flag=lit@externalized}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%
@@ -717,9 +730,12 @@
     \def\arch@name{\@arch/\@name}%
     \litmusset{\arch@name/do not extern/.try}%
     \iftoggle{lit@opt@extern}{%
-      \tikzsetnextfilename{\lit@opt@context/\arch@name.assem}%
+      \iflit@externalized\else%
+        \tikzsetnextfilename{\lit@opt@context/\arch@name.assem}%
+      \fi%
     }{}%
     \inputlitmustable[%
+      /litmus/picture externalized=true,
       \@arch,
       % This is mostly needed for RV, where 'architecture', as written
       % to the .state.tex file, is "RISCV" (instead of "RISC-V")
@@ -746,9 +762,12 @@
     \def\arch@name{\@arch/\@name}%
     \litmusset{\arch@name/do not extern/.try}%
     \iftoggle{lit@opt@extern}{%
-      \tikzsetnextfilename{\lit@opt@context/\arch@name.events}%
+      \iflit@externalized\else%
+        \tikzsetnextfilename{\lit@opt@context/\arch@name.events}%
+      \fi%
     }{}%
     \inputlitmuspicture[%
+      /litmus/picture externalized=true,
       \@arch,
       {\arch@name}/events/.try with warning,
       #1,
@@ -771,9 +790,12 @@
     \def\arch@name{\@arch/\@name}%
     \litmusset{\arch@name/do not extern/.try}%
     \iftoggle{lit@opt@extern}{%
-      \tikzsetnextfilename{\lit@opt@context/\arch@name.full}%
+      \iflit@externalized\else%
+        \tikzsetnextfilename{\lit@opt@context/\arch@name.full}%
+      \fi%
     }{}%
     \inputlitmustable[%
+      /litmus/picture externalized=true,
       \@arch,
       % This is mostly needed for RV, where 'architecture', as written
       % to the .state.tex file, is "RISCV" (instead of "RISC-V")
