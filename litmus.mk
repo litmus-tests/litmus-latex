@@ -323,7 +323,7 @@ $(BUILDDIR)/$(_JOBNAME)-externals/sentinel: $(EXTERNALS)
 	mkdir -p $(dir $@)
 	touch $@
 
-LATEXSOURCE ?= _JOBNAME
+LATEXSOURCE ?= \input{$(_JOBNAME)}
 define gen-external-pdf =
 	mkdir -p $(dir $@)
 	rm -f $@
@@ -333,7 +333,7 @@ define gen-external-pdf =
 # \tikzexternalrealjob to a unique value, and pass the real jobname in \litmusexternaljobname
 # We also copy jobname.aux to the <fake>_job.aux so width information can be read from it.
 	-cp $(BUILDDIR)/$(_JOBNAME).aux $(@:.pdf=)_job.aux
-	-$(PDFLATEX) $(LATEXFLAGS) -jobname "$(patsubst $(BUILDDIR)/%,%,$(@:.pdf=))" "\def\tikzexternalrealjob{$(@:.pdf=)_job}\def\litmusexternaljobname{$(_JOBNAME)}\input{$(LATEXSOURCE)}"
+	-$(PDFLATEX) $(LATEXFLAGS) -jobname "$(patsubst $(BUILDDIR)/%,%,$(@:.pdf=))" "\def\tikzexternalrealjob{$(@:.pdf=)_job}\def\litmusexternaljobname{$(_JOBNAME)}$(LATEXSOURCE)"
 	@[ -f '$@' ] || { echo "** Error: failed to build an externalized TikZ picture, see $(@:.pdf=.log)"; exit 1; }
 endef
 
