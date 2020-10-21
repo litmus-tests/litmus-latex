@@ -246,7 +246,7 @@ $(FIGSDIR)/%.tikz $(FIGSDIR)/%.states.tex:
 	fi
 
 # Build all the .tikz/.states.tex files (FIGS is defined in $(_JOBNAME).litmus.d)
-$(FIGSDIR)/$(_JOBNAME).tikz_figures.sentinel: $(addprefix $(FIGSDIR)/,$(FIGS:=.tikz) $(FIGS:=.states.tex))
+$(FIGSDIR)/$(_JOBNAME).tikz_figures.sentinel: $(addprefix $(FIGSDIR)/,$(FIGS:=.tikz) $(FIGS:=.states.tex) $(FIGS:=.hw.tex))
 	mkdir -p $(dir $@)
 	touch $@
 
