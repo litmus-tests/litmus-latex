@@ -42,10 +42,12 @@
 ## Now, running make after a minor change will run latex only once.
 ##
 
+FIND?=find
+
 check_tool = $(if $(shell command -v $1),,$(error "Error: missing '$1'"))
 $(call check_tool,md5sum)
 $(call check_tool,awk)
-$(call check_tool,find) # GNU find (-printf)
+$(call check_tool,$(FIND)) # GNU find (-printf)
 $(call check_tool,sed)
 $(call check_tool,sort)
 $(call check_tool,grep)
@@ -197,7 +199,7 @@ define findlitmus =
   $(eval _arch := $(patsubst %/,%,$(dir $1)))
   $(if $($(_arch)_SUBDIR),$(eval _arch := $($(_arch)_SUBDIR)))
   $(if $(wildcard $(TESTSDIRS:=/$(_arch))),,$(error Error: None of the directories in TESTSDIRS ($(TESTSDIRS)) have a subdir '$(_arch)'))
-  LITFILE="$$(find -L $(wildcard $(TESTSDIRS:=/$(_arch)))\
+  LITFILE="$$($(FIND) -L $(wildcard $(TESTSDIRS:=/$(_arch)))\
     -name '$(call escwildcards,$(notdir $1)).litmus'\
     -printf '$(_arch)/%P'\
     -quit)" &&\
@@ -391,14 +393,14 @@ clean_figures:
 .PHONY: clean_figures
 
 clean_tikz_figures:
-	find $(FIGSDIR) -name '*.tikz' -delete
-	find $(FIGSDIR) -name '*.states.tex' -delete
+	$(FIND) $(FIGSDIR) -name '*.tikz' -delete
+	$(FIND) $(FIGSDIR) -name '*.states.tex' -delete
 .PHONY: clean_tikz_figures
 
 clean_hw_tables:
-	find $(FIGSDIR) -name '*.hw-res' -delete
-	find $(FIGSDIR) -name '*.hw.tex' -delete
-	find $(FIGSDIR) -name '*.table.tex' -delete
+	$(FIND) $(FIGSDIR) -name '*.hw-res' -delete
+	$(FIND) $(FIGSDIR) -name '*.hw.tex' -delete
+	$(FIND) $(FIGSDIR) -name '*.table.tex' -delete
 	rm -f $(FIGSDIR)/*.hw-tables.sentinel
 .PHONY: clean_hw_tables
 
@@ -420,7 +422,7 @@ endif
 # Find .tikz/.states.tex files we generated but don't use any more
 find_unused_figures:
 ifneq "$(FIGS)" ""
-	@find $(FIGSDIR) -name '*.tikz' -or -name '*.states.tex' | grep -Fxv $(addprefix -e $(FIGSDIR)/,$(FIGS:=.tikz) $(FIGS:=.states.tex))\
+	@$(FIND) $(FIGSDIR) -name '*.tikz' -or -name '*.states.tex' | grep -Fxv $(addprefix -e $(FIGSDIR)/,$(FIGS:=.tikz) $(FIGS:=.states.tex))\
 	  || echo "No unused figures in '$(FIGSDIR)'"
 endif
 .PHONY: find_unused_figures
