@@ -42,6 +42,14 @@
 ## Now, running make after a minor change will run latex only once.
 ##
 
+check_tool = $(if $(shell command -v $1),,$(error "Error: missing '$1'"))
+$(call check_tool,md5sum)
+$(call check_tool,awk)
+$(call check_tool,find) # GNU find (-printf)
+$(call check_tool,sed)
+$(call check_tool,sort)
+$(call check_tool,grep)
+
 ## The following variables can be overridden but this must be before
 ## including this file and can not be target specific.
 ## TODO: I think making those variables target specific will work as
@@ -208,14 +216,19 @@ endef
 # is the first <name>.litmus file that 'find' finds in TESTSDIRS/<arch'>:
 #   $(FIGSDIR)/<arch>/<name>.tikz $(FIGSDIR)/<arch>/<name>.states.tex $(FIGSDIR)/<arch>/<name>.hw.tex: <.litmus file>
 #   FIGS += <arch>/<name>
+# NOTE: if something fails in the middle (e.g. find) the file is already created
+# so won't be generated again. We prevent that by writing to $@.tmp and mv at
+# the end. (better to use .DELETE_ON_ERROR, but we can't count on that)
 $(_JOBNAME).litmus.d: $(BUILDDIR)/$(_JOBNAME).litmusfigs
 ifneq "$(shell $(TIKZSCMD) 2>/dev/null | md5sum)" "$(LITMUSFIGSMD5)"
+	rm -f $@
 	{ printf "# Generated file (see litmus.mk) -- do not edit\n\n";\
 	  printf "# md5sum of \"$(TIKZSCMD)\"\n";\
 	  printf "LITMUSFIGSMD5 = %s\n\n" "$$($(TIKZSCMD) | md5sum)";\
-	} > $@
+	} > $@.tmp
 	@echo 'Looking for litmus files...'
-	@$(foreach test,$(shell $(TIKZSCMD)),$(call findlitmus,$(test),$@))
+	@$(foreach test,$(shell $(TIKZSCMD)),$(call findlitmus,$(test),$@.tmp))
+	mv $@.tmp $@
 	@echo 'Litmus files were added to $@'
 else
 	touch $@
