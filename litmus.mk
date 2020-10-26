@@ -44,7 +44,7 @@
 
 FIND?=find
 
-check_tool = $(if $(shell command -v $1),,$(error "Error: missing '$1'"))
+check_tool = $(if $(shell which $1),,$(error "Error: missing '$1'"))
 $(call check_tool,md5sum)
 $(call check_tool,awk)
 $(call check_tool,$(FIND)) # GNU find (-printf)
