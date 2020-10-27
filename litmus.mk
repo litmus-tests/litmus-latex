@@ -1,5 +1,9 @@
 ######################################################################
-## Generate .tikz and .states.tex files for litmus test figures
+## For using on a MAC: install (using homebrew, or your prefered
+## method) gmake, gfind and gawk, and set your PATH accordingly (you
+## can also set FIND and AWK to point to the right command).
+######################################################################
+## Generate .tikz (and other files) for litmus test figures
 ##
 ## Minimal (and inefficient) Makefile example:
 ## |include litmus.mk
@@ -42,15 +46,25 @@
 ## Now, running make after a minor change will run latex only once.
 ##
 
-FIND?=find
+FIND ?= find
+AWK ?= awk
 
-check_tool = $(if $(shell which $1),,$(error "Error: missing '$1'"))
+MSUM ?= msum7
+
+check_tool = $(if $(shell which $1),,$(eval MISSING_TOOLS += $1))
 $(call check_tool,md5sum)
-$(call check_tool,awk)
+$(call check_tool,$(AWK))  # GNU find (gensub)
 $(call check_tool,$(FIND)) # GNU find (-printf)
 $(call check_tool,sed)
 $(call check_tool,sort)
 $(call check_tool,grep)
+ifneq "$(MISSING_TOOLS)" ""
+ifeq "$(ERR_TOOLS)" ""
+  $(error Error: missing tool(s): $(MISSING_TOOLS) (set 'ERR_TOOLS=0' to ignore this error))
+else
+  $(warning Warning: missing tool(s): $(MISSING_TOOLS))
+endif
+endif
 
 ## The following variables can be overridden but this must be before
 ## including this file and can not be target specific.
@@ -72,7 +86,6 @@ REMSDIR ?= $(HOME)/rems
 # This is where 'find' should look for .litmus files
 TESTSDIRS += $(REMSDIR)/litmus-tests-regression-machinery/tests
 
-MSUM ?= msum7
 
 HWLOGS ?= hw-logs
 
@@ -280,7 +293,7 @@ $$(FIGSDIR)/$(1)/%.hw.tex: $$(addprefix $$(FIGSDIR)/$(1)/$$(_JOBNAME).,$$($(1)_M
 	for mach in $$^; do\
 	  grep -HF '($$*)' "$$$$mach" || echo "$$$${mach}:($$*) 0 0";\
 	done |\
-	  awk '\
+	  $(AWK) '\
 	    BEGIN {\
 	      o = 0;\
 	      r = 0;\
@@ -301,7 +314,7 @@ $$(FIGSDIR)/$(1)/%.hw.tex: $$(addprefix $$(FIGSDIR)/$(1)/$$(_JOBNAME).,$$($(1)_M
 $$(FIGSDIR)/$(1)/$$(_JOBNAME).%.hw-res: $$(HWLOGS)/$$($(1)_SUBDIR)/%/*
 	mkdir -p $$(dir $$@)
 	$(MSUM) -q $$(HWLOGS)/$$($(1)_SUBDIR)/$$*/* 2>/dev/null |\
-	  awk '$$$$1 == "Test" {printf "(%s) ", $$$$2} $$$$1 == "Positive:" {print $$$$2, $$$$4}' > $$@
+	  $(AWK) '$$$$1 == "Test" {printf "(%s) ", $$$$2} $$$$1 == "Positive:" {print $$$$2, $$$$4}' > $$@
 # We use .PRECIOUS below, instead of .SECONDARY, as the latter does not allow
 # patterns (%) and the former does. We just want to prevent make from deleting
 # the .hw-res file, in successful runs. If we let make delete these files, and
