@@ -281,12 +281,12 @@ $(FIGSDIR)/$(_JOBNAME).tikz_figures.sentinel: $(addprefix $(FIGSDIR)/,$(FIGS:=.t
 ##########
 
 define hw-table =
-# List of machines for the experimental result tables. Each machine is
+# List of machines/SoCs for the experimental result tables. Each machine is
 # expected to be a sub folder of $(HWLOGS)/$($(1)_SUBDIR).
-# Machines with multiple kinds of cores should be listed as mach/kind1
-# mach/kind2 and so on. The order of machines here determines the order
+# Machines with multiple microarchitectures should be listed as mach/march1
+# mach/march2 and so on. The order of machines here determines the order
 # in which they appear in the table
-$(1)_MACHS ?= $(shell cd $(HWLOGS)/$($(1)_SUBDIR) && ls -d1 */  | sed 's:/$$::')
+$(1)_MACHS ?= $(shell cd $(HWLOGS)/$($(1)_SUBDIR) && find . -type f -printf '%h\n' | sed 's:^./::' | sort -u)
 
 $$(FIGSDIR)/$(1)/%.hw.tex: $$(addprefix $$(FIGSDIR)/$(1)/$$(_JOBNAME).,$$($(1)_MACHS:=.hw-res))
 	mkdir -p $$(dir $$@)
@@ -313,8 +313,10 @@ $$(FIGSDIR)/$(1)/%.hw.tex: $$(addprefix $$(FIGSDIR)/$(1)/$$(_JOBNAME).,$$($(1)_M
 
 $$(FIGSDIR)/$(1)/$$(_JOBNAME).%.hw-res: $$(HWLOGS)/$$($(1)_SUBDIR)/%/*
 	mkdir -p $$(dir $$@)
-	$(MSUM) -q $$(HWLOGS)/$$($(1)_SUBDIR)/$$*/* 2>/dev/null |\
-	  $(AWK) '$$$$1 == "Test" {printf "(%s) ", $$$$2} $$$$1 == "Positive:" {print $$$$2, $$$$4}' > $$@
+	$(MSUM) -q `find $$(HWLOGS)/$$($(1)_SUBDIR)/$$* -maxdepth 1 -type f` >$$@.temp
+	@[ -s $$@.temp ] || { echo 'Error: $(MSUM) ($$*) produced an empty file'; exit 1; }
+	$(AWK) '$$$$1 == "Test" {printf "(%s) ", $$$$2} $$$$1 == "Positive:" {print $$$$2, $$$$4}' $$@.temp > $$@
+	rm -f $$@.temp
 # We use .PRECIOUS below, instead of .SECONDARY, as the latter does not allow
 # patterns (%) and the former does. We just want to prevent make from deleting
 # the .hw-res file, in successful runs. If we let make delete these files, and
