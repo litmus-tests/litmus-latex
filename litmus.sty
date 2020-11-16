@@ -1165,7 +1165,8 @@
 % we need to set the overhangs associated with @{} to 0.
 % \rowcolor is also the reason we use three columns, instead of 'r@{/}l'.
 \newcolumntype{O}{r@{}>{\columncolor{white}[0pt]}c@{}>{\columncolor{white}[0pt][\tabcolsep]}l}
-\newcommand{\litmusexphead}[1]{\multicolumn{3}{@{}c@{}}{#1}}
+\newcommand{\litmusexphead}[1]{\multicolumn{3}{@{}c@{}}{\litmusexpheadtext{#1}}}
+\newcommand{\litmusexpheadtext}[1]{#1}
 
 % '\litmusabrv{<n>}' typesets the three most significant digits of <n>
 % with the suffix 'k' (for thousands), or 'M' (for millions), or 'G'
@@ -1281,7 +1282,7 @@
       \def\litmusobstotal{0/0}%
       \def\litmusobservations{}%
     }%
-    % Sets things according the the status (allowed/forbidden) of the test
+    % Sets things according to the status (allowed/forbidden) of the test
     \ifdefstring{\lit@status}{forbidden}{% Forbid
       \def\lit@status{Forbid}%
       \def\@lit@res{\lit@res\litmusresForbid}%
