@@ -152,8 +152,8 @@
   litmus ref/.code={\let\lit@opt@ref=#1},
   litmusref/.forward to=/litmus options/litmus ref,
   %
-  % Follows \litmus with the name of the figure where the diagram is,
-  % e.g., "(Figure 1.1)"
+  % Follows the first use of \litmus (or any \litmus+) with the name of the
+  % figure where the diagram is, e.g., "MP (Figure 1.1)".
   append litmus ref/.is toggle flag=lit@opt@append@ref,
   append litmus ref=true,
   appendlitmusref/.forward to=/litmus options/append litmus ref,
@@ -282,6 +282,7 @@
 %   \newcommand{\@foo}...
 \newcommand\@ifplus[1]{\@ifnextchar +{\@firstoftwo{#1}}}
 \newcommand\@ifminus[1]{\@ifnextchar -{\@firstoftwo{#1}}}
+\newcommand\@iftilde[1]{\@ifnextchar ~{\@firstoftwo{#1}}}
 
 % Create a macro with distinct behaviour for every value
 % Example:
@@ -1050,19 +1051,24 @@
     \@litmusstar%
   }%
   \iftoggle{lit@opt@append@ref}{%
-    \ (\@litmusref)%
+    \ifcsdef{ref@\lit@opt@context @\@targetarch/\@targetname @inc}{}{% else
+      \ (\@litmusref)%
+    }%
   }{}%
 }
 \newrobustcmd{\@litmusplus}{%
   \insertlitmusfig{\@sourcearch}{\@sourcename}{\@targetfigarchs}{\@targetarch}%
+  \csgundef{ref@\lit@opt@context @\@targetarch/\@targetname @inc}%
   \@litmusminus%
 }
 \newrobustcmd{\@litmus}{%
-  \ifcsdef{litmusfig@\lit@opt@context @\@targetarch/\@targetname @inc}{%
-    \@litmusminus%
-  }{% else
-    \@litmusplus%
+  \ifcsdef{litmusfig@\lit@opt@context @\@targetarch/\@targetname @inc}{}{% else
+    \insertlitmusfig{\@sourcearch}{\@sourcename}{\@targetfigarchs}{\@targetarch}%
   }%
+  \@litmusminus%
+}
+\newrobustcmd{\@litmustilde}{%
+  {\togglefalse{lit@opt@append@ref}\@litmus}%
 }
 \newrobustcmd{\litmus@args}[1]{\def\litmus@args@next{#1}\@litmus@args}
 \newrobustcmd{\@litmus@args}[2][\lit@opt@defultarch]{%
@@ -1081,8 +1087,9 @@
   \@ifstar{\litmus@args\@litmusstar}{% else
   \@ifplus{\litmus@args\@litmusplus}{% else
   \@ifminus{\litmus@args\@litmusminus}{% else
+  \@iftilde{\litmus@args\@litmustilde}{% else
   \litmus@args\@litmus%
-  }}}%
+  }}}}%
 }
 
 % Typeset a reference to a litmus figure that was added using \litmus.
@@ -1091,6 +1098,7 @@
 \newrobustcmd{\litmusref}{\litmus@args\@litmusref}
 \newrobustcmd{\@litmusref}{%
   \ifcsdef{litmusfig@\lit@opt@context @\@targetarch/\@targetname @label}{%
+    \csgdef{ref@\lit@opt@context @\@targetarch/\@targetname @inc}{}%
     \ebars\lit@opt@ref|{\csuse{litmusfig@\lit@opt@context @\@targetarch/\@targetname @label}}{\@targetarch}{\@targetname}|%
 %     \litmuscfg{litmus ref/.expanded={\csuse{litmusfig@\lit@opt@context @\@targetarch/\@targetname @label}}{\@targetarch}{\@targetname}}%
   }{% else
