@@ -903,12 +903,20 @@
 %         \litmusassem[baseline=(table header.north), every assem/.append style={text width={max(\@widthstwo)}}]{#1}{#2}{#6}%
 %       \end{tabular}%
       \begin{tabular}[t]{ccc}%
-        \litmusassem[threads baseline, every assem/.append style={text width={max(\@widthsone)}}]{#1}{#2}{#3} &
+        \litmusassem[threads baseline,%
+          every assem/.append style={text width={max(\@widthsone)}},%
+        ]{#1}{#2}{#3} &
         \multirow[t]{2}{*}{\litmusevents[threads baseline, GEN from #3/.try]{#1}{#2}{#3}} &
-        \litmusassem[threads baseline, every assem/.append style={text width={max(\@widthstwo)}}]{#1}{#2}{#5}\\%
+        \litmusassem[threads baseline,%
+          every assem/.append style={text width={max(\@widthstwo)}},%
+        ]{#1}{#2}{#5}\\%
         %
-        \litmusassem[baseline=(table header.north), every assem/.append style={text width={max(\@widthsone)}}]{#1}{#2}{#4} & &
-        \litmusassem[baseline=(table header.north), every assem/.append style={text width={max(\@widthstwo)}}]{#1}{#2}{#6}%
+        \litmusassem[baseline=(table header.north),%
+          every assem/.append style={text width={max(\@widthsone)}},%
+        ]{#1}{#2}{#4} & &
+        \litmusassem[baseline=(table header.north),%
+          every assem/.append style={text width={max(\@widthstwo)}},%
+        ]{#1}{#2}{#6}%
       \end{tabular}%
     }%
   }%
@@ -1051,21 +1059,24 @@
     \@litmusstar%
   }%
   \iftoggle{lit@opt@append@ref}{%
-    \ifcsdef{ref@\lit@opt@context @\@targetarch/\@targetname @inc}{}{% else
+    %% \ifcsdef{ref@\lit@opt@context @\@targetarch/\@targetname @inc}{}{% else
       \ (\@litmusref)%
-    }%
+    %% }%
   }{}%
 }
 \newrobustcmd{\@litmusplus}{%
   \insertlitmusfig{\@sourcearch}{\@sourcename}{\@targetfigarchs}{\@targetarch}%
-  \csgundef{ref@\lit@opt@context @\@targetarch/\@targetname @inc}%
+  %% \csgundef{ref@\lit@opt@context @\@targetarch/\@targetname @inc}%
   \@litmusminus%
 }
 \newrobustcmd{\@litmus}{%
-  \ifcsdef{litmusfig@\lit@opt@context @\@targetarch/\@targetname @inc}{}{% else
-    \insertlitmusfig{\@sourcearch}{\@sourcename}{\@targetfigarchs}{\@targetarch}%
+  \ifcsdef{litmusfig@\lit@opt@context @\@targetarch/\@targetname @inc}{%
+    {\togglefalse{lit@opt@append@ref}\@litmusminus}%
+  }{% else
+    %% \insertlitmusfig{\@sourcearch}{\@sourcename}{\@targetfigarchs}{\@targetarch}%
+    %% \@litmusminus%
+    \@litmusplus
   }%
-  \@litmusminus%
 }
 \newrobustcmd{\@litmustilde}{%
   {\togglefalse{lit@opt@append@ref}\@litmus}%

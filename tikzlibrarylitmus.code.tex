@@ -182,14 +182,14 @@
 
 \litmusset{
   non-mixed-size/.style={
-    /litmus/memfp/.code n args={3}{%
+    /litmus/memfp/.code n args={4}{%
       \tikzmath{
         let \addr = ##1;
         let \offs = ##2;
         let \size = ##3;
         if \offs==0 then { print{\addr}; }
         else { print{\addr+\offs}; };
-      }%
+      }=##4%
     },
     /litmus/memrf/.code 2 args=rf,
     /litmus/memfr/.code 2 args=fr,
@@ -211,14 +211,14 @@
     \slices@temp%
   },
   old-mixed-size/.style={
-    /litmus/memfp/.code n args={3}{%
+    /litmus/memfp/.code n args={4}{%
       \tikzmath{
         let \addr = ##1;
         let \offs = ##2;
         let \size = ##3;
         if \offs==0 then { print{\addr/\size}; }
         else { print{\addr+\offs/\size}; };
-      }%
+      }=##4%
     },
     /litmus/memrf/.code 2 args={rf\,\pgfkeysalso{/litmus/old-mixed-size/memslices={##1}{##2}}},
     /litmus/memfr/.code 2 args={fr\,\pgfkeysalso{/litmus/old-mixed-size/memslices={##1}{##2}}},
@@ -226,7 +226,23 @@
   },
 }
 
+\def\ifhex#1{\ifstrempty{#1}{\@secondoftwo}{\@ifhex-#1-0x\lit@del}}
+\def\@ifhex#1-0x#2\lit@del{\ifstrempty{#1}}
+\def\@gobblehex 0x#1\lit@del{#1}
+
+\def\ifzero#1{\ifstrempty{#1}{\@secondoftwo}{\@ifzero-#1-0\lit@del}}
+\def\@ifzero#1-0#2\lit@del{\ifstrempty{#1}}
+\def\@gobblezeros #1\lit@del{\ifzero{#1}{\expandafter\@gobblezeros\@gobblezero #1\lit@del\lit@del}{#1}}
+\def\@gobblezero 0#1\lit@del{#1}
+
 \litmusset{
+  symbol footprint/.code args={#1 from #2 to #3}{%
+    \tikzmath{
+      \litsymstart{#1} = #2;
+      \litsymend{#1} = #3;
+    }%
+    \csdef{lit@sym@fp:#1}{exists}%
+  },
   mixed-size/memslices/.code 2 args={%
     \def\slices@temp{\@gobble}%
     \foreach \i/\j in {#2} {%
@@ -238,15 +254,47 @@
     }%
     #1[\slices@temp]%
   },
+  event equal/.code={=},
   mixed-size/.style={
-    /litmus/memfp/.code n args={3}{%
+    /litmus/memfp/.code n args={4}{%
       \tikzmath{
         let \addr = ##1;
         let \offs = ##2;
         let \size = ##3;
         \i = int(\offs + \size - 1);
-        if \size==1 then { print{\addr[\offs]}; }
+        if \size == 1 then { print{\addr[\offs]}; }
         else { print{\addr[\offs..\i]}; };
+        print{\litmusset{event equal}};
+        let \cond = \ifhex{##4}{1}{0};
+        if \cond then {
+          let \cond = \ifcsdef{lit@sym@fp:##1}{1}{0};
+          if \cond then {
+            print{0x};
+            let \addrstart = \litsymstart{##1};
+            let \addrend = \litsymend{##1};
+            if \offs + \size <= \addrend then {
+              for \i in {\offs + \size,...,\addrend}{
+                print{\_\_};
+              };
+            };
+            print{\@gobblehex##4\lit@del};
+            if \addrstart + 1 <= \offs then {
+              for \i in {\addrstart + 1,...,\offs}{
+                print{\_\_};
+              };
+            };
+          } else {
+            print{%
+              \edef\lit@val{\@gobblehex##4\lit@del}%
+              \edef\lit@val{\expandafter\@gobblezeros\lit@val\lit@del}%
+              \edef\lit@val{\expandafter\ifstrempty\expandafter{\lit@val}{0}{\lit@val}}%
+              \pgfmathbasetodec{\lit@val}{\lit@val}{16}%
+              \lit@val%
+            };
+          };
+        } else {
+          print{##4};
+        };
       }%
     },
     /litmus/memrf/.code 2 args={rf\,\pgfkeysalso{/litmus/mixed-size/memslices={##1}{##2}}},
@@ -602,7 +650,7 @@
     %     The pgf math function 'computedwidthof("#1")' expands to the
     %     computed widths of this diagram.
     /utils/ifboolexpe={test {\ifcsdef{#1@litmusinstructionswidths@uid}}} then {
-      /utils/package warning={litmus-tikz-library}{'compute assem text width' expects a unique identifier, '#1' was already used.},
+      /utils/package warning={litmus-tikz-library}{'compute assem text width' expects a unique identifier, '#1' is already used.},
     } else {
       /utils/exec={\csgdef{#1@litmusinstructionswidths@uid}{true}},
       /utils/ifboolexpe={not test {\ifcsdef{#1@litmusinstructionswidths}}} then {
@@ -776,7 +824,7 @@
     /tikz/\lit@keyname/.pic/.expanded={
       \noexpand\path[pic actions]
                     { [ /litmus/eiids order/.initial=,
-                        /litmus/#1,
+                        /litmus/.cd scope={#1},
                         /litmus/events={\lit@keyname},
                         /litmus/eiids order/.get=\noexpand\lit@temp@eiids,
                         /litmus/event nodes/.initial=,
@@ -907,6 +955,9 @@
   init left/.style={
     /litmus/event init-#1/.append style={/tikz/xshift=-0.75em, /tikz/left=of #1},
   },
+  init below/.style={
+    /litmus/event init-#1/.append style={/tikz/yshift=-1.25ex, /tikz/below=of #1},
+  },
   init above right/.style={
     /litmus/event init-#1/.append style={/tikz/above right=of #1},
     /litmus/(init-#1) rf (#1)/.append style=/tikz/swap,
@@ -990,14 +1041,16 @@
     /litmus/check value={/litmus/event #1/fp offset}{#4},
     /litmus/check value={/litmus/event #1/fp size}{#5},
     /litmus/check value={/litmus/event #1/value}{#6},
+    /litmus/event contents/.initial={%
+      \litmusset{mem access/#2/.try, mem access/.retry={#2}}\,\litmusset{memfp/.expanded={\lit@addr}{\lit@offs}{\lit@size}{\lit@val}}%
+    },
     /litmus/event={#1},
     /litmus/event #1/fp addr/.get with default={\lit@addr}{#3},
     /litmus/event #1/fp offset/.get with default={\lit@offs}{#4},
     /litmus/event #1/fp size/.get with default={\lit@size}{#5},
     /litmus/event #1/value/.get with default={\lit@val}{#6},
-    /tikz/node contents={%
-      \litmusset{mem access/#2/.try, mem access/.retry={#2}}\,\litmusset{memfp/.expanded={\lit@addr}{\lit@offs}{\lit@size}}=\lit@val%
-    },
+    /litmus/event contents/.get=\lit@event@contents,
+    /tikz/node contents/.expand once=\lit@event@contents,
   },
   mem access/.code={#1},
 }
@@ -1317,6 +1370,9 @@
       },
       #1, % Should be positioning
     ];
+  },
+  table header/long name/.style={
+    node contents={\rlap\lit@name\hfill\llap{\raisebox{2ex}{\lit@arch}}},
   },
   initial state box/.code={
     \node[

@@ -1,4 +1,4 @@
-######################################################################
+#####################################################################
 ## For using on a MAC: install (using homebrew, or your prefered
 ## method) gmake, gfind and gawk, and set your PATH accordingly (you
 ## can also set FIND and AWK to point to the right command).
@@ -269,6 +269,7 @@ $(FIGSDIR)/%.tikz $(FIGSDIR)/%.states.tex:
 	  $(RMEM) $(RMEMFLAGS) $(if $(findstring /mixed-size/,$<),$(RMEMFLAGSMIXEDSIZE)) -model relaxed -dot_dir $(dir $@) $<;\
 	fi
 	@if [ ! -f '$@' ]; then\
+	  rm -f $(@:.tikz=.states.tex) &&\
 	  echo "Error: rmem did not generate $@, check that the expected state is observable and that the name of the test in the header of $< matches the file name." &&\
 	  exit 1;\
 	fi
