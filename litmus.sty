@@ -140,9 +140,21 @@
   target figs/.store in=\lit@opt@targetfigs,
   target figs=,
   targetfigs/.forward to=/litmus options/target figs,
+  target events fig/.store in=\lit@opt@targeteventsfig,
+  target events fig=,
+  targeteventsfig/.forward to=/litmus options/target events fig,
   figure placement/.store in=\lit@opt@figplacement,
   figure placement=htb,
   figureplacement/.forward to=/litmus options/figure placement,
+  scale events/.store in=\lit@opt@scaleevents,
+  scale events=1,
+  scaleevents/.forward to=/litmus options/scale events,
+  scale assem/.store in=\lit@opt@scaleassem,
+  scale assem=1,
+  scaleassem/.forward to=/litmus options/scale assem,
+  scale full/.store in=\lit@opt@scalefull,
+  scale full=1,
+  scalefull/.forward to=/litmus options/scale full,
   %
   % Typeset \litmusref. The argument should be a macro that takes
   % the following arguments and typesets a reference:
@@ -725,26 +737,28 @@
   \ebars\litmusassem@e{#1}|{#2}{#3}{#4}|%
 }
 \newrobustcmd{\litmusassem@e}[4]{%
-  {%
-    \expandedlitmusname\@name{#2}{#3}{#4}%
-    \ifstrempty{#4}{\def\@arch{#2}}{\def\@arch{#4}}%
-    \def\arch@name{\@arch/\@name}%
-    \litmusset{\arch@name/do not extern/.try}%
-    \iftoggle{lit@opt@extern}{%
-      \iflit@externalized\else%
-        \tikzsetnextfilename{\lit@opt@context/\arch@name.assem}%
-      \fi%
-    }{}%
-    \inputlitmustable[%
-      /litmus/picture externalized=true,
-      \@arch,
-      % This is mostly needed for RV, where 'architecture', as written
-      % to the .state.tex file, is "RISCV" (instead of "RISC-V")
-      architecture/.expanded={\arch{\@arch}},
-      compute assem text width=\arch@name,
-      {\arch@name}/assem/.try with warning,
-      #1,
-    ]{assem}{\arch@name}%
+  \scalebox{\lit@opt@scaleassem}{%
+    {%
+      \expandedlitmusname\@name{#2}{#3}{#4}%
+      \ifstrempty{#4}{\def\@arch{#2}}{\def\@arch{#4}}%
+      \def\arch@name{\@arch/\@name}%
+      \litmusset{\arch@name/do not extern/.try}%
+      \iftoggle{lit@opt@extern}{%
+        \iflit@externalized\else%
+          \tikzsetnextfilename{\lit@opt@context/\arch@name.assem}%
+        \fi%
+      }{}%
+      \inputlitmustable[%
+        /litmus/picture externalized=true,
+        \@arch,
+        % This is mostly needed for RV, where 'architecture', as written
+        % to the .state.tex file, is "RISCV" (instead of "RISC-V")
+        architecture/.expanded={\arch{\@arch}},
+        compute assem text width=\arch@name,
+        {\arch@name}/assem/.try,% with warning,
+        #1,
+      ]{assem}{\arch@name}%
+    }%
   }%
 }
 
@@ -757,22 +771,24 @@
   \ebars\litmusevents@e{#1}|{#2}{#3}{#4}|
 }
 \newrobustcmd{\litmusevents@e}[4]{%
-  {%
-    \expandedlitmusname\@name{#2}{#3}{#4}%
-    \ifstrempty{#4}{\def\@arch{#2}}{\def\@arch{#4}}%
-    \def\arch@name{\@arch/\@name}%
-    \litmusset{\arch@name/do not extern/.try}%
-    \iftoggle{lit@opt@extern}{%
-      \iflit@externalized\else%
-        \tikzsetnextfilename{\lit@opt@context/\arch@name.events}%
-      \fi%
-    }{}%
-    \inputlitmuspicture[%
-      /litmus/picture externalized=true,
-      \@arch,
-      {\arch@name}/events/.try with warning,
-      #1,
-    ]{events}{\arch@name}%
+  \scalebox{\lit@opt@scaleevents}{%
+    {%
+      \expandedlitmusname\@name{#2}{#3}{#4}%
+      \ifstrempty{#4}{\def\@arch{#2}}{\def\@arch{#4}}%
+      \def\arch@name{\@arch/\@name}%
+      \litmusset{\arch@name/do not extern/.try}%
+      \iftoggle{lit@opt@extern}{%
+        \iflit@externalized\else%
+          \tikzsetnextfilename{\lit@opt@context/\arch@name.events}%
+        \fi%
+      }{}%
+      \inputlitmuspicture[%
+        /litmus/picture externalized=true,
+        \@arch,
+        {\arch@name}/events/.try,% with warning,
+        #1,
+      ]{events}{\arch@name}%
+    }%
   }%
 }
 
@@ -785,25 +801,27 @@
   \ebars\litmusfull@e{#1}|{#2}{#3}{#4}|
 }
 \newrobustcmd{\litmusfull@e}[4]{%
-  {%
-    \expandedlitmusname\@name{#2}{#3}{#4}%
-    \ifstrempty{#4}{\def\@arch{#2}}{\def\@arch{#4}}%
-    \def\arch@name{\@arch/\@name}%
-    \litmusset{\arch@name/do not extern/.try}%
-    \iftoggle{lit@opt@extern}{%
-      \iflit@externalized\else%
-        \tikzsetnextfilename{\lit@opt@context/\arch@name.full}%
-      \fi%
-    }{}%
-    \inputlitmustable[%
-      /litmus/picture externalized=true,
-      \@arch,
-      % This is mostly needed for RV, where 'architecture', as written
-      % to the .state.tex file, is "RISCV" (instead of "RISC-V")
-      architecture/.expanded={\arch{\@arch}},
-      {\arch@name}/full/.try with warning,
-      #1,
-    ]{full}{\arch@name}%
+  \scalebox{\lit@opt@scalefull}{%
+    {%
+      \expandedlitmusname\@name{#2}{#3}{#4}%
+      \ifstrempty{#4}{\def\@arch{#2}}{\def\@arch{#4}}%
+      \def\arch@name{\@arch/\@name}%
+      \litmusset{\arch@name/do not extern/.try}%
+      \iftoggle{lit@opt@extern}{%
+        \iflit@externalized\else%
+          \tikzsetnextfilename{\lit@opt@context/\arch@name.full}%
+        \fi%
+      }{}%
+      \inputlitmustable[%
+        /litmus/picture externalized=true,
+        \@arch,
+        % This is mostly needed for RV, where 'architecture', as written
+        % to the .state.tex file, is "RISCV" (instead of "RISC-V")
+        architecture/.expanded={\arch{\@arch}},
+        {\arch@name}/full/.try,% with warning,
+        #1,
+      ]{full}{\arch@name}%
+    }%
   }%
 }
 
@@ -836,121 +854,120 @@
 %   #1: architecture (GEN, A64, PPC, RV, x86)
 %   #2: litmus test name (e.g. MP)
 %   #3: target architecture
-\newrobustcmd{\litfig@one}[3]{%
-  \ebars\litfig@one@e|{#1}{#2}{#3}|%
+\newrobustcmd{\litfig@one}[4]{%
+  \ebars\litfig@one@e|{#1}{#2}{#3}{#4}|%
 }
-\newrobustcmd{\litfig@one@e}[3]{%
-  \ifstrequal{#3}{GEN}{%
-    \litmusevents[threads baseline]{#1}{#2}{\litmusgensource}%
-  }{%
-    \litmusevents[threads baseline]{#1}{#2}{#3}%
-  }\ %
-  \litmusassem[threads baseline]{#1}{#2}{#3}%
+\newrobustcmd{\litfig@one@e}[4]{%
+  \litmusevents[threads baseline]{#1}{#2}{#3}%
+  \ %
+  \litmusassem[threads baseline]{#1}{#2}{#4}%
 }
 
 % Typeset a litmus test diagram for two targets
 %   #1: architecture (GEN, A64, PPC, RV, x86)
 %   #2: litmus test name (e.g. MP)
-%   #3: target architecture
-%   #4: target architecture
-\newrobustcmd{\litfig@two}[4]{%
-  \litfig@list{#1}{#2}{#3}{#4}%
+%   #3: target architecture for events
+%   #4: target architecture for assem
+%   #5: target architecture for assem
+\newrobustcmd{\litfig@two}[5]{%
+  \litfig@list{#1}{#2}{#3}{#4}{#5}%
 }
 
-\newrobustcmd{\litfig@three}[5]{%
-%   \litfig@list{#1}{#2}{#3}{#4,#5}%
-  \ebars\litfig@three@e|{#1}{#2}{#3}{#4}{#5}|%
+% Typeset a litmus test diagram for three targets
+%   #1: architecture (GEN, A64, PPC, RV, x86)
+%   #2: litmus test name (e.g. MP)
+%   #3: target architecture for events
+%   #4: target architecture for assem
+%   #5: target architecture for assem
+%   #6: target architecture for assem
+\newrobustcmd{\litfig@three}[6]{%
+  \ebars\litfig@three@e|{#1}{#2}{#3}{#4}{#5}{#6}|%
 }
-\newrobustcmd{\litfig@three@e}[5]{%
+\newrobustcmd{\litfig@three@e}[6]{%
   {%
-    \expandedlitmusname\@name@three{#1}{#2}{#3}%
     \expandedlitmusname\@name@four{#1}{#2}{#4}%
-    \edef\@widths{computedwidthof{"#3/\@name@three"},computedwidthof{"#4/\@name@four"}}%
+    \expandedlitmusname\@name@five{#1}{#2}{#5}%
+    \edef\@widths{computedwidthof{"#4/\@name@four"},computedwidthof{"#5/\@name@five"}}%
     %
     \begin{tabular}[t]{cc}%
       \litmusevents[threads baseline, GEN from #3/.try]{#1}{#2}{#3} &
       \litmusset{every assem/.append style={text width={max(\@widths)}}}%
-      \litmusassem[threads baseline]{#1}{#2}{#3}\\
+      \litmusassem[threads baseline]{#1}{#2}{#4}\\
       %
-      \litmusassem[threads baseline]{#1}{#2}{#5} &
+      \litmusassem[threads baseline]{#1}{#2}{#6} &
       \litmusset{every assem/.append style={text width={max(\@widths)}}}%
-      \litmusassem[threads baseline]{#1}{#2}{#4}%
+      \litmusassem[threads baseline]{#1}{#2}{#5}%
     \end{tabular}%
   }%
 }
 
-\newrobustcmd{\litfig@four}[6]{%
-%   \litfig@list{#1}{#2}{#3}{#4,#5,#6}%
-  \ebars\litfig@four@e|{#1}{#2}{#3}{#4}{#5}{#6}|%
+% Typeset a litmus test diagram for four targets
+%   #1: architecture (GEN, A64, PPC, RV, x86)
+%   #2: litmus test name (e.g. MP)
+%   #3: target architecture for events
+%   #4: target architecture for assem
+%   #5: target architecture for assem
+%   #6: target architecture for assem
+%   #7: target architecture for assem
+\newrobustcmd{\litfig@four}[7]{%
+  \ebars\litfig@four@e|{#1}{#2}{#3}{#4}{#5}{#6}{#7}|%
 }
-\newrobustcmd{\litfig@four@e}[6]{%
+\newrobustcmd{\litfig@four@e}[7]{%
   {%
-    \expandedlitmusname\@name@three{#1}{#2}{#3}%
     \expandedlitmusname\@name@four{#1}{#2}{#4}%
-    \edef\@widthsone{computedwidthof{"#3/\@name@three"},computedwidthof{"#4/\@name@four"}}%
-    %
     \expandedlitmusname\@name@five{#1}{#2}{#5}%
+    \edef\@widthsone{computedwidthof{"#4/\@name@four"},computedwidthof{"#5/\@name@five"}}%
+    %
     \expandedlitmusname\@name@six{#1}{#2}{#6}%
-    \edef\@widthstwo{computedwidthof{"#5/\@name@five"},computedwidthof{"#6/\@name@six"}}%
+    \expandedlitmusname\@name@seven{#1}{#2}{#7}%
+    \edef\@widthstwo{computedwidthof{"#6/\@name@six"},computedwidthof{"#7/\@name@seven"}}%
     %
     \resizebox{\textwidth}{!}{%
-%       \litmusevents[threads baseline, GEN from #3/.try]{#1}{#2}{#3}%
-%       \begin{tabular}[t]{cc}%
-%         \litmusassem[threads baseline, every assem/.append style={text width={max(\@widthsone)}}]{#1}{#2}{#3} &
-%         \litmusassem[threads baseline, every assem/.append style={text width={max(\@widthstwo)}}]{#1}{#2}{#5}\\%
-%         %
-%         \litmusassem[baseline=(table header.north), every assem/.append style={text width={max(\@widthsone)}}]{#1}{#2}{#4} &
-%         \litmusassem[baseline=(table header.north), every assem/.append style={text width={max(\@widthstwo)}}]{#1}{#2}{#6}%
-%       \end{tabular}%
       \begin{tabular}[t]{ccc}%
         \litmusassem[threads baseline,%
           every assem/.append style={text width={max(\@widthsone)}},%
-        ]{#1}{#2}{#3} &
+        ]{#1}{#2}{#4} &
         \multirow[t]{2}{*}{\litmusevents[threads baseline, GEN from #3/.try]{#1}{#2}{#3}} &
         \litmusassem[threads baseline,%
           every assem/.append style={text width={max(\@widthstwo)}},%
-        ]{#1}{#2}{#5}\\%
+        ]{#1}{#2}{#6}\\%
         %
         \litmusassem[baseline=(table header.north),%
           every assem/.append style={text width={max(\@widthsone)}},%
-        ]{#1}{#2}{#4} & &
+        ]{#1}{#2}{#5} & &
         \litmusassem[baseline=(table header.north),%
           every assem/.append style={text width={max(\@widthstwo)}},%
-        ]{#1}{#2}{#6}%
+        ]{#1}{#2}{#7}%
       \end{tabular}%
     }%
   }%
 }
 
-
-\newrobustcmd{\litfig@five}[7]{%
-  \litfig@list{#1}{#2}{#3}{#4,#5,#6,#7}%
+\newrobustcmd{\litfig@five}[8]{%
+  \litfig@list{#1}{#2}{#3}{#4}{#5,#6,#7,#8}%
 }
 
-\newrobustcmd{\litfig@six}[8]{%
-  \litfig@list{#1}{#2}{#3}{#4,#5,#6,#7,#8}%
-}
-
-\newrobustcmd{\litfig@sevenandmore}[9]{%
-  \litfig@list{#1}{#2}{#3}{#4,#5,#6,#7,#8,#9}%
+\newrobustcmd{\litfig@sixandmore}[9]{%
+  \litfig@list{#1}{#2}{#3}{#4}{#5,#6,#7,#8,#9}%
 }
 
 % Typeset a litmus test diagram for at least two targets
 %   #1: architecture (GEN, A64, PPC, RV, x86)
 %   #2: litmus test name (e.g. MP)
-%   #3: target architecture
-%   #4: list of target architectures (at least one)
-\newrobustcmd{\litfig@list}[4]{%
-  \ebars\litfig@list@e|{#1}{#2}{#3}{#4}|%
+%   #3: target architecture for events
+%   #4: target architecture
+%   #5: list of target architectures (at least one)
+\newrobustcmd{\litfig@list}[5]{%
+  \ebars\litfig@list@e|{#1}{#2}{#3}{#4}{#5}|%
 }
-\newrobustcmd{\litfig@list@e}[4]{%
+\newrobustcmd{\litfig@list@e}[5]{%
   {%
     \def\@widths{\@gobble}%
     \def\do##1{%
       \expandedlitmusname\@name{#1}{#2}{##1}%
       \edef\@widths{\expandonce\@widths,computedwidthof{"##1/\@name"}}%
     }%
-    \docsvlist{#3,#4}%
+    \docsvlist{#4,#5}%
     \litmusset{%
       every assem/.append style={text width={max(\@widths)}},
     }%
@@ -959,8 +976,8 @@
     }%
     \litmusevents[threads baseline, GEN from #3/.try]{#1}{#2}{#3}%
     \begin{tabular}[t]{l}%
-      \rule{0pt}{5.5ex}\litmusassem[threads baseline]{#1}{#2}{#3}\\%
-      \docsvlist{#4}%
+      \rule{0pt}{5.5ex}\litmusassem[threads baseline]{#1}{#2}{#4}\\%
+      \docsvlist{#5}%
     \end{tabular}%
   }%
 }
@@ -968,35 +985,35 @@
 %   #1: figure placement specifier (default: htb)
 %   #2: architecture (GEN, A64, PPC, RV, x86)
 %   #3: litmus test name (e.g. MP+dmb.sys)
-%   #4: list of target architectures
-%   #5: caption target arch
-\newrobustcmd{\insertlitmusfig}[5][\lit@opt@figplacement]{%
-  \ebars\insertlitmusfig@e|{#1}{#2}{#3}{#4}{#5}|
+%   #4: architecture for the events diagram
+%   #5: list of target architectures for assem tables
+%   #6: caption target arch
+\newrobustcmd{\insertlitmusfig}[6][\lit@opt@figplacement]{%
+  \ebars\insertlitmusfig@e|{#1}{#2}{#3}{#4}{#5}{#6}|
 }
-\newrobustcmd{\insertlitmusfig@e}[5]{%
-  \expandedlitmusname\@name{#2}{#3}{#5}%
-  \@litmuslabels@e{#2}{#3}{#4}{#5}{fig:litmus:\lit@opt@context:#5:\@name}{\@hypertargets}%
+\newrobustcmd{\insertlitmusfig@e}[6]{%
+  \expandedlitmusname\@name{#2}{#3}{#6}%
+  \@litmuslabels@e{#2}{#3}{#5}{#6}{fig:litmus:\lit@opt@context:#6:\@name}{\@hypertargets}%
   \begin{figure}[#1]%
     \centering%
     \litmushypertarget{\@hypertargets}{%
       \ifcsdef{litmusfig@#2/#3}{%
         \csuse{litmusfig@#2/#3}%
       }{% else
-        \switchcsvlist{#4}{%
-          \litfig@one{#2}{#3}{#2},% empty list
-          \litfig@one{#2}{#3},%     single arch
-          \litfig@two{#2}{#3},%     two archs
-          \litfig@three{#2}{#3},%   three archs
-          \litfig@four{#2}{#3},%    ...
-          \litfig@five{#2}{#3},%
-          \litfig@six{#2}{#3},%
-          \litfig@sevenandmore{#2}{#3}%
+        \switchcsvlist{#5}{%
+          \litfig@one{#2}{#3}{#6}{#6},% empty list
+          \litfig@one{#2}{#3}{#4},%     single arch
+          \litfig@two{#2}{#3}{#4},%     two archs
+          \litfig@three{#2}{#3}{#4},%   three archs
+          \litfig@four{#2}{#3}{#4},%    ...
+          \litfig@five{#2}{#3}{#4},%
+          \litfig@sixandmore{#2}{#3}{#4},
         }%
       }%
     }%
-    \caption{Litmus test \textsf{\thelitmusname{#2}{#3}{#5}}}%
-    \label{fig:litmus:\lit@opt@context:#5:\@name}%
-    \forcsvlist{\litmusindex[textbf]{#2}{#3}}{#5,#4}%
+    \caption{Litmus test \textsf{\thelitmusname{#2}{#3}{#6}}}%
+    \label{fig:litmus:\lit@opt@context:#6:\@name}%
+    \forcsvlist{\litmusindex[textbf]{#2}{#3}}{#6,#5}%
   \end{figure}%
 }
 
@@ -1043,7 +1060,7 @@
 %            prints the name with a link to it. The figure architectures
 %            can be set by the package option 'target figs' (stored in
 %            \lit@opt@targetfigs), empty means the same as the target
-%            architecture (i.e. #1).
+%            architecture.
 % \litmus+ - Adds a figure and prints the name with a link to it.
 % \litmus- - Prints the name with a link to a pre-existing figure.
 % \litmus* - Prints the name without adding a figure or a link.
@@ -1065,7 +1082,7 @@
   }{}%
 }
 \newrobustcmd{\@litmusplus}{%
-  \insertlitmusfig{\@sourcearch}{\@sourcename}{\@targetfigarchs}{\@targetarch}%
+  \insertlitmusfig{\@sourcearch}{\@sourcename}{\@targeteventsfigarch}{\@targetfigarchs}{\@targetarch}%
   %% \csgundef{ref@\lit@opt@context @\@targetarch/\@targetname @inc}%
   \@litmusminus%
 }
@@ -1091,6 +1108,9 @@
   \expandedlitmusname\@targetname{#1}{#2}{\@targetarch}%
   \edef\@targetfigarchs{%
     \ifdefempty{\lit@opt@targetfigs}{\@targetarch}{\lit@opt@targetfigs}%
+  }%
+  \edef\@targeteventsfigarch{%
+    \ifdefempty{\lit@opt@targeteventsfig}{\@targetarch}{\lit@opt@targeteventsfig}%
   }%
   \litmus@args@next%
 }
