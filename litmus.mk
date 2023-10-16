@@ -53,7 +53,7 @@ MSUM ?= msum7
 
 check_tool = $(if $(shell which $1),,$(eval MISSING_TOOLS += $1))
 $(call check_tool,md5sum)
-$(call check_tool,$(AWK))  # GNU find (gensub)
+$(call check_tool,$(AWK))  # GNU awk (gensub)
 $(call check_tool,$(FIND)) # GNU find (-printf)
 $(call check_tool,sed)
 $(call check_tool,sort)
@@ -181,6 +181,8 @@ litmusprereq = \
 
 ######################################################################
 ######################################################################
+TIKZSCMD = sed 's/[^:]*://' '$(BUILDDIR)/$(_JOBNAME).litmusfigs' | sort -u
+
 ifneq "$(_JOBNAME)" ""
 ## Everything below this line depends on _JOBNAME being set
 
@@ -196,7 +198,6 @@ $(_JOBTARGET).rebuild: $(shell ! grep -q '^run latex again.' $(BUILDDIR)/$(_JOBN
 # Escapes wildcards in litmus names
 escwildcards = $(subst [,\[,$(subst ],\],$(subst *,\*,$(subst ?,\?,$1))))
 
-TIKZSCMD = sed 's/[^:]*://' '$(BUILDDIR)/$(_JOBNAME).litmusfigs' | sort -u
 
 # If there is no rmem we don't want dependencies that will trigger rmem
 ifneq "$(RMEM)" ""
@@ -264,6 +265,7 @@ ARCHS := $(sort $(foreach f,$(FIGS),$(firstword $(subst /, ,$f))))
 $(FIGSDIR)/%.tikz $(FIGSDIR)/%.states.tex: RMEMMODEL ?= $($(firstword $(subst /, ,$*))_RMEMMODEL)
 $(FIGSDIR)/%.tikz $(FIGSDIR)/%.states.tex:
 	mkdir -p $(dir $@)
+	rm -f '$@'
 	$(RMEM) $(RMEMFLAGS) $(if $(findstring /mixed-size/,$<),$(RMEMFLAGSMIXEDSIZE)) $(if $(STATE),-final_cond 'observed $(STATE)') -model $(RMEMMODEL) -dot_dir $(dir $@) $<
 	if [ ! -f '$@' ]; then\
 	  $(RMEM) $(RMEMFLAGS) $(if $(findstring /mixed-size/,$<),$(RMEMFLAGSMIXEDSIZE)) -model relaxed -dot_dir $(dir $@) $<;\
@@ -284,8 +286,8 @@ $(FIGSDIR)/$(_JOBNAME).tikz_figures.sentinel: $(addprefix $(FIGSDIR)/,$(FIGS:=.t
 define hw-table =
 # List of machines/SoCs for the experimental result tables. Each machine is
 # expected to be a sub folder of $(HWLOGS)/$($(1)_SUBDIR).
-# Machines with multiple microarchitectures should be listed as mach/march1
-# mach/march2 and so on. The order of machines here determines the order
+# Machines with multiple microarchitectures should be listed as mach/uarch1
+# mach/uarch2 and so on. The order of machines here determines the order
 # in which they appear in the table
 $(1)_MACHS ?= $(shell cd $(HWLOGS)/$($(1)_SUBDIR) && find . -type f -printf '%h\n' | sed 's:^./::' | sort -u)
 

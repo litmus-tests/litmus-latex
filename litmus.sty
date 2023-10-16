@@ -754,12 +754,22 @@
         % This is mostly needed for RV, where 'architecture', as written
         % to the .state.tex file, is "RISCV" (instead of "RISC-V")
         architecture/.expanded={\arch{\@arch}},
-        compute assem text width=\arch@name,
+        compute assem text width={\lit@opt@context/\arch@name},
         {\arch@name}/assem/.try,% with warning,
         #1,
       ]{assem}{\arch@name}%
     }%
   }%
+}
+
+% computed width pgf-math functions that add the current context as a prefix
+\pgfkeys{
+  /pgf/declare function={
+    litcomputedwidthofthread(\@uid,\@tid)=computedwidthofthread("\lit@opt@context/\@uid",\@tid);
+  },
+  /pgf/declare function={
+    litcomputedwidthof(\@uid)=computedwidthof("\lit@opt@context/\@uid");
+  },
 }
 
 % Typeset a litmus test events diagram
@@ -887,7 +897,7 @@
   {%
     \expandedlitmusname\@name@four{#1}{#2}{#4}%
     \expandedlitmusname\@name@five{#1}{#2}{#5}%
-    \edef\@widths{computedwidthof{"#4/\@name@four"},computedwidthof{"#5/\@name@five"}}%
+    \edef\@widths{litcomputedwidthof{"#4/\@name@four"},litcomputedwidthof{"#5/\@name@five"}}%
     %
     \begin{tabular}[t]{cc}%
       \litmusevents[threads baseline, GEN from #3/.try]{#1}{#2}{#3} &
@@ -916,11 +926,11 @@
   {%
     \expandedlitmusname\@name@four{#1}{#2}{#4}%
     \expandedlitmusname\@name@five{#1}{#2}{#5}%
-    \edef\@widthsone{computedwidthof{"#4/\@name@four"},computedwidthof{"#5/\@name@five"}}%
+    \edef\@widthsone{litcomputedwidthof{"#4/\@name@four"},litcomputedwidthof{"#5/\@name@five"}}%
     %
     \expandedlitmusname\@name@six{#1}{#2}{#6}%
     \expandedlitmusname\@name@seven{#1}{#2}{#7}%
-    \edef\@widthstwo{computedwidthof{"#6/\@name@six"},computedwidthof{"#7/\@name@seven"}}%
+    \edef\@widthstwo{litcomputedwidthof{"#6/\@name@six"},litcomputedwidthof{"#7/\@name@seven"}}%
     %
     \resizebox{\textwidth}{!}{%
       \begin{tabular}[t]{ccc}%
@@ -965,7 +975,7 @@
     \def\@widths{\@gobble}%
     \def\do##1{%
       \expandedlitmusname\@name{#1}{#2}{##1}%
-      \edef\@widths{\expandonce\@widths,computedwidthof{"##1/\@name"}}%
+      \edef\@widths{\expandonce\@widths,litcomputedwidthof{"##1/\@name"}}%
     }%
     \docsvlist{#4,#5}%
     \litmusset{%
