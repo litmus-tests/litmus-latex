@@ -62,6 +62,10 @@
 \newcounter{lit@opt@midrule@count}
 \setcounter{lit@opt@midrule@count}{5}
 
+% This macro ends in the .ind file where @ has special meaning, hence can't use
+% @ in the macro name.
+\def\litoptname#1{\textsf{#1}}
+
 \def\lit@opt@ref#1#2#3{Figure~\ref{#1}}
 
 % Setup package options
@@ -155,6 +159,11 @@
   scale full/.store in=\lit@opt@scalefull,
   scale full=1,
   scalefull/.forward to=/litmus options/scale full,
+  %
+  % Typeset the litmus name. The argument should be a macro that takes
+  % a single argument, the litmus name.
+  litmus name/.code={\let\litoptname=#1},
+  litmusname/.forward to=/litmus options/litmus name,
   %
   % Typeset \litmusref. The argument should be a macro that takes
   % the following arguments and typesets a reference:
@@ -646,19 +655,9 @@
     /litmus/thread 0/.append style={every thread header/.append style={alias=thread-0}},
     baseline=(thread-0.base),
   },
-  every litmus/.append style={
-    every node/.append style={node font=\sffamily},
-  },
   every litmus table/.append style={
     every final state allowed/.style={fill=green!15},
     every final state forbidden/.style={fill=red!15},
-    every state/.append style={
-      state prefix font=\normalsize\sffamily,
-      node font=\footnotesize\ttfamily,
-%       inner sep=1pt,
-    },
-    every hw observations prefix/.style={node font=\footnotesize\sffamily},
-    every hw observation/.style={node font=\footnotesize\sffamily},
     expected observations allowed/.style={
       experimental result/every not observed/.style=blue,
     },
@@ -1021,7 +1020,7 @@
         }%
       }%
     }%
-    \caption{Litmus test \textsf{\thelitmusname{#2}{#3}{#6}}}%
+    \caption{Litmus test \litoptname{\thelitmusname{#2}{#3}{#6}}}%
     \label{fig:litmus:\lit@opt@context:#6:\@name}%
     \forcsvlist{\litmusindex[textbf]{#2}{#3}}{#6,#5}%
   \end{figure}%
@@ -1047,7 +1046,7 @@
       \expandedlitmusname\@name{#2}{#3}{#4}%
       \ebars\index[litmus]|{{%
         \arch@order{#4}@\noexpand\textbf{\arch{#4}}!%
-          \@name @\noexpand\textsf{\thelitmusname{#4}{\@name}{#4}}%
+          \@name @\noexpand\litoptname{\thelitmusname{#4}{\@name}{#4}}%
         |#1%
       }}|%
     }%
@@ -1075,7 +1074,7 @@
 % \litmus- - Prints the name with a link to a pre-existing figure.
 % \litmus* - Prints the name without adding a figure or a link.
 \newrobustcmd{\@litmusstar}{%
-  \textsf{\thelitmusname{\@sourcearch}{\@sourcename}{\@targetarch}}%
+  \litoptname{\thelitmusname{\@sourcearch}{\@sourcename}{\@targetarch}}%
   \litmusindex{\@sourcearch}{\@sourcename}{\@targetarch}%
 }
 \newrobustcmd{\@litmusminus}{%

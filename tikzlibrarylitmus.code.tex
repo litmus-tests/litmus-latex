@@ -896,7 +896,6 @@
       \csxdef{lit@#1@tid}{\lit@tid}%
       \csxdef{lit@#1@row}{\the\pgfmatrixcurrentrow}%
     },
-    /tikz/node font=\sffamily,
     % If the heights of the first event in each thread do not match the
     % thread headers will not be aligned.
     /tikz/text height={height("abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUVWXYZ 0123456789 =:/[]")},
@@ -1159,7 +1158,6 @@
     /tikz/edge node={
       node[
         auto,
-        font=\sffamily,
         inner sep=1pt,
         /litmus/.cd scope={
           every label/.try,

@@ -45,6 +45,21 @@
 ## |	$(call ifneeded,pdflatex $<)
 ## Now, running make after a minor change will run latex only once.
 ##
+## Externalized litmus tests will not automatically be rebuilt if the only
+## change is in latex. To force a rebuild of externalized litmus tests, set
+## 'REBUILDLIT=<pattern> ...', where <pattern>s are grep EREs that are matched
+## agents lines of the form '<context>:<arch>/<test name>'.
+## Examples:
+##   # rebuild all variants of SB, of all archs, in all contexts:
+##   make REBUILDLIT='SB' ...
+##   # rebuild just SB, of all archs, in all contexts:
+##   make REBUILDLIT='SB$' ...
+##   # rebuild the AArch64 SB in all contexts:
+##   make REBUILDLIT='A64/SB$' ...
+##   # rebuild the AArch64 SB in the main context:
+##   make REBUILDLIT='main:A64/SB$' ...
+##   # rebuild variants of SB (excluding SB):
+##   make REBUILDLIT='SB\+' ...
 
 FIND ?= find
 AWK ?= awk
@@ -84,7 +99,7 @@ FIGSDIR ?= litmus-tikz-figures
 # This is where the REMS tools are
 REMSDIR ?= $(HOME)/rems
 # This is where 'find' should look for .litmus files
-TESTSDIRS += $(REMSDIR)/litmus-tests-regression-machinery/tests
+# TESTSDIRS += $(REMSDIR)/litmus-tests-regression-machinery/tests
 
 
 HWLOGS ?= hw-logs
@@ -125,7 +140,7 @@ RMEMFLAGSMIXEDSIZE := -pp_hex true $(RMEMFLAGSMIXEDSIZE)
 export TEXINPUTS := .:$(abspath $(FIGSDIR)):$(TEXINPUTS)
 
 # This is where make looks for .litmus prerequisites
-vpath %.litmus $(TESTSDIRS)
+# vpath %.litmus $(TESTSDIRS)
 
 ######################################################################
 
@@ -208,14 +223,15 @@ ifeq "$(findstring q,$(MAKEFLAGS))" ""
 include $(_JOBNAME).litmus.d
 
 # NOTE: In order for this canned recipe to work inside a foreach it must
-# start (or end) with an empty line!!!
+# start (or end) with an empty line (eval expands to empty)!!!
+# NOTE: we rely of find searching starting-points in the order they are given.
 define findlitmus =
   $(eval _arch := $(patsubst %/,%,$(dir $1)))
   $(if $($(_arch)_SUBDIR),$(eval _arch := $($(_arch)_SUBDIR)))
   $(if $(wildcard $(TESTSDIRS:=/$(_arch))),,$(error Error: None of the directories in TESTSDIRS ($(TESTSDIRS)) have a subdir '$(_arch)'))
   LITFILE="$$($(FIND) -L $(wildcard $(TESTSDIRS:=/$(_arch)))\
     -name '$(call escwildcards,$(notdir $1)).litmus'\
-    -printf '$(_arch)/%P'\
+    -printf '%p'\
     -quit)" &&\
   if [ -n "$$LITFILE" ]; then\
     echo '$$(FIGSDIR)/$1.tikz $$(FIGSDIR)/$1.states.tex:' "$$LITFILE" &&\
@@ -400,6 +416,15 @@ $(BUILDDIR)/$(_JOBNAME)-externals/$(context)/%.full.pdf: $(FIGSDIR)/%.tikz $(FIG
 	$(gen-external-pdf)
 endef
 $(foreach context,$(shell sed 's/:.*//' $(BUILDDIR)/$(_JOBNAME).litmusfigs | sort -u),$(eval $(value externals)))
+
+# Force build litmus tests that match REBUILDLIT
+define externals_forcebuild =
+$(BUILDDIR)/$(_JOBNAME)-externals/$(lit).assem.pdf: _FORCEBUILD
+$(BUILDDIR)/$(_JOBNAME)-externals/$(lit).events.pdf: _FORCEBUILD
+$(BUILDDIR)/$(_JOBNAME)-externals/$(lit).full.pdf: _FORCEBUILD
+endef
+$(foreach lit,$(foreach pat,$(REBUILDLIT),$(shell grep -E '$(pat)' $(BUILDDIR)/$(_JOBNAME).litmusfigs | sed 's|:|/|')),\
+$(eval $(value externals_forcebuild)))
 endif
 
 endif # ifneq "$(_JOBNAME)" ""
