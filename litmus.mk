@@ -280,6 +280,7 @@ ARCHS := $(sort $(foreach f,$(FIGS),$(firstword $(subst /, ,$f))))
 # Prerequisites are in $(_JOBNAME).litmus.d
 $(FIGSDIR)/%.tikz $(FIGSDIR)/%.states.tex: RMEMMODEL ?= $($(firstword $(subst /, ,$*))_RMEMMODEL)
 $(FIGSDIR)/%.tikz $(FIGSDIR)/%.states.tex:
+	$(if $<,,$(error Error: could not find a litmus test file for $*. Make sure the file is reachable from TESTSDIRS and then remove $(_JOBNAME).litmus.d))
 	mkdir -p $(dir $@)
 	rm -f '$@'
 	$(RMEM) $(RMEMFLAGS) $(if $(findstring /mixed-size/,$<),$(RMEMFLAGSMIXEDSIZE)) $(if $(STATE),-final_cond 'observed $(STATE)') -model $(RMEMMODEL) -dot_dir $(dir $@) $<
@@ -472,7 +473,7 @@ endif
 
 # After rebuilding the .tikz figures, revert figures that changed only
 # in comments (not including the hash comment).
-checkout_unchanged_figs: CHANGEDFIGS := $(shell git diff -G '^([^%]|(% Litmus hash:))' --name-only -- '$(FIGSDIR)/')
+checkout_unchanged_figs: CHANGEDFIGS := $(shell git diff -G '^([^%]|(% Litmus hash:))' --name-only --relative -- '$(FIGSDIR)/')
 checkout_unchanged_figs:
 	@$(if $(CHANGEDFIGS),\
 	     printf 'Checkout all the files in $(FIGSDIR)/ except:\n  $(CHANGEDFIGS)\n',\
