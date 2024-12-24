@@ -16,6 +16,8 @@ export max_print_line ?= 1000
 
 # Setup the litmus test figures
 REMSDIR ?= $(HOME)/rems
+# ./tests should be a link to litmus-tests-regression-machinery/tests
+TESTSDIRS = ./tests
 FIGSDIR ?= figs
 
 include $(LITMUSLATEXDIR)/litmus.mk

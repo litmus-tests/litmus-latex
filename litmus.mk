@@ -48,7 +48,10 @@
 ## Externalized litmus tests will not automatically be rebuilt if the only
 ## change is in latex. To force a rebuild of externalized litmus tests, set
 ## 'REBUILDLIT=<pattern> ...', where <pattern>s are grep EREs that are matched
-## agents lines of the form '<context>:<arch>/<test name>'.
+## against lines of the form '<context>:<arch>/<test name>'. Note that +.[] need
+## to be escaped with \. This does not cause rmem to re-generate the figures,
+## if you want to do that you need to `touch` the .litmus file, or remove the
+## .tikz file in $(FIGSDIR).
 ## Examples:
 ##   # rebuild all variants of SB, of all archs, in all contexts:
 ##   make REBUILDLIT='SB' ...

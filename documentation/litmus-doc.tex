@@ -24,6 +24,7 @@
   % The target architectures of litmus figures of \litmus (empty means
   % same as the source arch)
   target figs={A64,RV,PPC},
+  target events fig=A64,
   % Typeset \litmusref
 %   litmus ref=...,% \ref{#1} and gobble the following two arguments
 %   context=main,
@@ -62,6 +63,71 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \begin{document}
+
+\section{Package options}
+
+\verb|\usepackage[index,hyperref]{litmus}| - load the litmus package. Options
+can be provided as in this example, or later with \verb|\litmuscfg{...}|.
+
+%% \newindex{litmus}{litmus.idx}{litmus.ind}{Index of Litmus Tests}%
+\verb!index=true|false! - (default: false) when true, use the index package
+to add an index of litmus tests.
+
+\verb!extern=true|false! - (default: false) when true, externalize litmus
+figures.
+
+\verb!hyperref=true|false! - (default: false) use the hyperref package to
+link litmus names with their figures.
+
+\verb!strict translation=<true|false>! - (default: false) when true, generate an error if a
+litmus name that needs to be translated includes an edge that has no
+translation. When false, such edges are copied as is to the translation.
+
+\verb!default arch=GEN|A64|PPC|RV! - (default: GEN) the default architecture
+in which litmus names are given to \verb!\litmus!.
+
+\verb!target arch=|A64|PPC|RV! - (default: empty) if not empty, translate the
+litmus name given to \verb!\litmus! to this architecture before typesetting it.
+
+\verb!target figs={A64|PPC|RV,...}! - (default: empty) which architecture to
+include in assembly for. empty means the same architecture as
+\verb!target arch!.
+
+\verb!target events fig=|A64|PPC|RV! - (default: empty) which architecture to
+use for the events diagram. empty means the same as \verb!target arch!. Note,
+the default value is not valid if both \verb!target arch! and
+\verb!default arch! also use their default values, as this effectively means
+\verb!target events fig! is \verb!GEN!, which doesn't make sense.
+
+\verb!figure placement=...! - (default: \verb!htb!) how to place the figures.
+
+\verb!scale events=<factor>! - (default: 1)
+
+\verb!scale assem=<factor>! - (default: 1)
+
+\verb!scale full=<factor>! - (default: 1)
+
+\verb!litmus name=<macro>! - \verb!<macro>! should take 1 argument and typeset
+it as a litmus name.
+
+\verb!litmus ref=<macro>! - \verb!<macro>! should be a macro that takes
+  the following arguments and typesets a reference:
+  \#1 is set to the label of the litmus figure;
+  \#2 is set to the target architecture;
+  \#3 is set to the target name.
+
+\verb!append litmus ref=true|false! - (default: true) when true, follow the
+first use of \verb!\litmus! (or any \verb!\litmus+!) with the name of the
+figure where the diagram is (e.g.\ ``MP (Figure 1.1)'').
+
+\verb!context=<name>! - (default: main) The \textit{context} becomes part of
+the reference name of the litmus test. This is useful when you want to include
+the same test multiple times. (context is also prefixed to hyperref links and
+the externalised name).
+
+\verb!exp results midrule=|none|<n>! - (default: 5) in experimental result
+tables, draw a midrule every few lines. \verb!none! disables this option;
+\verb!<n>! draw every \verb!n! lines; when empty, re-enable the option.
 
 \section{Macros}
 \verb|\litmus{<name>}| - adds a figure of the litmus, if one does not

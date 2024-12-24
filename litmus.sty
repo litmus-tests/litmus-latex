@@ -412,7 +412,6 @@
 %   #1: source architecture (GEN, A64, PPC, RV, x86)
 %   #2: litmus test name (e.g. MP+fens)
 %   #3: target architecture
-
 \newrobustcmd{\thelitmusname}[3]{%
   \begingroup%
     \ebars\@parsename|{#1}{#2}{#3}|\@parsename@res%
@@ -1046,17 +1045,30 @@
       \expandedlitmusname\@name{#2}{#3}{#4}%
       \ebars\index[litmus]|{{%
         \arch@order{#4}@\noexpand\textbf{\arch{#4}}!%
-          \@name @\noexpand\litoptname{\thelitmusname{#4}{\@name}{#4}}%
+          %% I'm not sure why the call to \thelitmusname was needed before
+          %% \@name @\noexpand\litoptname{\thelitmusname{#4}{\@name}{#4}}%
+          \@name @\noexpand\litoptname{\@name}%
         |#1%
       }}|%
+      \ifstrequal{#4}{GEN}{}{% else
+        \ebars\index[litmus]|{{%
+            0@\noexpand\textbf{All architectures}!%
+            \@name @\noexpand\litoptname{\@name}%
+            %% Add the arch in parenthesis, but that splits tests like CoRR to
+            %% multiple entries.
+            %% {\noexpand\scriptsize \ (\arch{#4})}%
+            |#1%
+        }}|%
+      }%
     }%
   }{}%
 }
 
-% This value is used for sorting the architectures in the index. We
-% want Generic to be first, the others will be sorted alphabetically.
+% This value is used for sorting the architectures in the index. We want "All
+% architectures" to be first and "Generic" to be second, the others will be
+% sorted alphabetically.
 \newswitch[\arch{#1}]\arch@order
-  \switchcase\arch@order{GEN}{0} % Numbers are sorted before letters
+  \switchcase\arch@order{GEN}{1} % Numbers are sorted before letters
 
 % Typeset a litmus test name. If the package option 'target arch'
 % (stored in \lit@opt@targetarch) is not empty, converts the name to

@@ -540,6 +540,7 @@ For example, this document uses this:
   draw box/.is if flag=drawbox, draw box,
   /litmus/every litmus/.style={
     AArch64,
+    node font=\sffamily,
     % Add a dashed line to all the litmus pictures that follow, showing their bounding box
     /tikz/draw box/.if true=then {
       execute at end scope={
@@ -562,6 +563,7 @@ For example, this document uses this:
   draw box/.is if flag=drawbox, draw box,
   /litmus/every litmus/.style={
     AArch64,
+    node font=\sffamily,
     % Add a dashed line to all the litmus pictures, showing their bounding box
     /tikz/draw box/.if true=then {
       execute at end scope={
