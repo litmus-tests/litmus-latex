@@ -63,6 +63,12 @@
 ##   make REBUILDLIT='main:A64/SB$' ...
 ##   # rebuild variants of SB (excluding SB):
 ##   make REBUILDLIT='SB\+' ...
+##
+## You can also rebuild an externalized test without rebuilding the whole
+## document, for example:
+## make build/doc-externals/main/A64/MP.events.pdf
+## make build/doc-externals/main/A64/MP.assem.pdf
+##
 
 FIND ?= find
 AWK ?= awk
@@ -239,6 +245,7 @@ define findlitmus =
   if [ -n "$$LITFILE" ]; then\
     echo '$$(FIGSDIR)/$1.tikz $$(FIGSDIR)/$1.states.tex:' "$$LITFILE" &&\
     echo 'FIGS += $1' &&\
+    echo '$(_arch)_LITMUS_FILES +=' "$$LITFILE" &&\
     echo;\
   else\
     echo 'Warning: cannot find ($(_arch)) $(notdir $1).litmus' >&2;\
@@ -435,6 +442,15 @@ endif # ifneq "$(_JOBNAME)" ""
 
 ######################################################################
 
+ifeq "$(_JOBNAME)" ""
+jobname_from_externals = _JOBNAME=$(lastword $(subst /, ,$(firstword $(subst -externals/, ,$1))))
+
+$(BUILDDIR)/%.events.pdf $(BUILDDIR)/%.assem.pdf $(BUILDDIR)/%.full.pdf: _FORCEBUILD
+	$(MAKE) $(call jobname_from_externals,$@) REBUILDLIT='^' "$@"
+endif
+
+######################################################################
+
 clean_figures:
 	rm -rf $(FIGSDIR)
 .PHONY: clean_figures
@@ -454,17 +470,21 @@ clean_hw_tables:
 ######################################################################
 ######################################################################
 
-ifeq "$(MAKECMDGOALS)" "find_unused_figures"
-define include_litmus_d =
-include $d
-_JOBNAME := $(d:.litmus.d=)
-$(if $(shell [ ! -f '$(BUILDDIR)/$(_JOBNAME).litmusfigs' ] || [ "$$($(TIKZSCMD) | md5sum)" = "$(LITMUSFIGSMD5)" ] || echo 1),\
-    $(error Error: $(_JOBNAME).litmus.d is out of date))
+ifeq "$(WITH_INCLUDE)" ""
+define make_with_litmus_d =
+	$(if $(wildcard *.litmus.d),,$(error Error: no *.litmus.d files))
+	+$(MAKE) WITH_INCLUDE='$(wildcard *.litmus.d)' $1
 endef
-$(foreach d,$(wildcard *.litmus.d),$(eval $(value include_litmus_d)))
-else ifneq "$(filter find_unused_figures,$(MAKECMDGOALS))" ""
-  $(error Error: you can only use the target 'find_unused_figures' by itself)
-endif
+
+find_unused_figures:
+	$(call make_with_litmus_d, $@)
+.PHONY: find_unused_figures
+
+@litmus-latex-%: _FORCEBUILD
+	$(call make_with_litmus_d, $@)
+
+else
+$(foreach mk_file,$(WITH_INCLUDE),$(eval include $(mk_file)))
 
 # Find .tikz/.states.tex files we generated but don't use any more
 find_unused_figures:
@@ -473,6 +493,11 @@ ifneq "$(FIGS)" ""
 	  || echo "No unused figures in '$(FIGSDIR)'"
 endif
 .PHONY: find_unused_figures
+
+@litmus-latex-%: _FORCEBUILD
+	$(if $($*_LITMUS_FILES),,$(error Error: no litmus tests for this architecture: $*))
+	printf '%s\n' $($*_LITMUS_FILES) | sort > $@
+endif
 
 # After rebuilding the .tikz figures, revert figures that changed only
 # in comments (not including the hash comment).

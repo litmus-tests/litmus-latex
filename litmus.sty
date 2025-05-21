@@ -68,6 +68,10 @@
 
 \def\lit@opt@ref#1#2#3{Figure~\ref{#1}}
 
+\def\litmuscaption#1#2#3{Litmus test \litoptname{\thelitmusname{#1}{#2}{#3}}}
+\def\lit@opt@shortcaption#1#2#3{\litmuscaption{#1}{#2}{#3}}
+\def\lit@opt@caption#1#2#3{\litmuscaption{#1}{#2}{#3}}
+
 % Setup package options
 % NOTE: LaTeX removes all spaces from the package options before passing
 % them to processing, hence options with spaces must also have a key
@@ -178,6 +182,27 @@
   append litmus ref/.is toggle flag=lit@opt@append@ref,
   append litmus ref=true,
   appendlitmusref/.forward to=/litmus options/append litmus ref,
+  %
+  % Typeset the caption of litmus figures. The argument should be a macro that
+  % takes the following arguments and typesets a caption:
+  % #1: architecture (GEN, A64, PPC, RV, x86)
+  % #2: litmus test name (e.g. MP+dmb.sys)
+  % #3: caption target arch
+  caption/.code={\let\lit@opt@caption=#1},
+  %
+  % Add text to figure captions.
+  caption suffix/.store in=\lit@opt@captionsuffix,
+  caption suffix={},
+  captionsuffix/.forward to=/litmus options/caption suffix,
+  %
+  % Typeset the short caption (e.g. for use in \listoffigures) of litmus
+  % figures. The argument should be a macro that takes the following arguments
+  % and typesets a short caption:
+  % #1: architecture (GEN, A64, PPC, RV, x86)
+  % #2: litmus test name (e.g. MP+dmb.sys)
+  % #3: caption target arch
+  short caption/.code={\let\lit@opt@shortcaption=#1},
+  shortcaption/.forward to=/litmus options/short caption,
   %
   % The 'context' becomes part of the reference name of the litmus test.
   % This is useful when you want to include the same test multiple times.
@@ -989,6 +1014,7 @@
     \end{tabular}%
   }%
 }
+
 % Typeset a litmus figure.
 %   #1: figure placement specifier (default: htb)
 %   #2: architecture (GEN, A64, PPC, RV, x86)
@@ -1019,7 +1045,7 @@
         }%
       }%
     }%
-    \caption{Litmus test \litoptname{\thelitmusname{#2}{#3}{#6}}}%
+    \caption[\lit@opt@shortcaption{#2}{#3}{#6}]{\lit@opt@caption{#2}{#3}{#6}\lit@opt@captionsuffix}%
     \label{fig:litmus:\lit@opt@context:#6:\@name}%
     \forcsvlist{\litmusindex[textbf]{#2}{#3}}{#6,#5}%
   \end{figure}%
@@ -1073,8 +1099,9 @@
 % Typeset a litmus test name. If the package option 'target arch'
 % (stored in \lit@opt@targetarch) is not empty, converts the name to
 % the architecture 'target arch' before typesetting it.
-%   #1: (optional) source architecture (GEN, A64, PPC, RV, x86), the
-%       default is set by the package option 'default arch' (stored in
+%   #1: (optional) passed to \litmuscfg. Additionally, any of the following keys 
+%       can be used to specify the source architecture: GEN, A64, PPC, RV, x86
+%       (the default is set by the package option 'default arch' and stored in
 %       \lit@opt@defultarch).
 %   #2: litmus test name
 % \litmus  - If the figure does not already exist adds a figure and
@@ -1120,20 +1147,37 @@
   {\togglefalse{lit@opt@append@ref}\@litmus}%
 }
 \newrobustcmd{\litmus@args}[1]{\def\litmus@args@next{#1}\@litmus@args}
-\newrobustcmd{\@litmus@args}[2][\lit@opt@defultarch]{%
-  \edef\@sourcearch{#1}%
-  \edef\@sourcename{#2}%
-  \edef\@targetarch{%
-    \ifdefempty{\lit@opt@targetarch}{#1}{\lit@opt@targetarch}%
+\newrobustcmd{\@litmus@args}[2][]{%
+  {% scope for the litmuscfg
+    \litmuscfg{%
+      arch/.store in=\@sourcearch,
+      % do not use arch/.expanded=..! it is possible for #1 below to reassign
+      % \lit@opt@defultarch (e.g. 'default arch=...'), and we want that to take
+      % effect.
+      arch=\lit@opt@defultarch,
+      GEN/.style={arch=GEN},
+      A64/.style={arch=A64},
+      PPC/.style={arch=PPC},
+      RV/.style={arch=RV},
+      x86/.style={arch=x86},
+      #1%
+    }%
+    \edef\@sourcename{#2}%
+    \@litmus@args@set%
+    \litmus@args@next%
   }%
-  \expandedlitmusname\@targetname{#1}{#2}{\@targetarch}%
+}
+\newrobustcmd{\@litmus@args@set}{%
+  \edef\@targetarch{%
+    \ifdefempty{\lit@opt@targetarch}{\@sourcearch}{\lit@opt@targetarch}%
+  }%
+  \expandedlitmusname\@targetname{\@sourcearch}{\@sourcename}{\@targetarch}%
   \edef\@targetfigarchs{%
     \ifdefempty{\lit@opt@targetfigs}{\@targetarch}{\lit@opt@targetfigs}%
   }%
   \edef\@targeteventsfigarch{%
     \ifdefempty{\lit@opt@targeteventsfig}{\@targetarch}{\lit@opt@targeteventsfig}%
   }%
-  \litmus@args@next%
 }
 \newrobustcmd{\litmus}{%
   \@ifstar{\litmus@args\@litmusstar}{% else
@@ -1175,7 +1219,12 @@
 % where <label> is the label of the figure. This will associate
 % <test name> with <label> (for \litmusref) and set <control sequence>
 % to the value you should pass to \litmushypertarget.
-\newrobustcmd{\litmuslabels}{\litmus@args\@litmuslabels}
+\newrobustcmd{\litmuslabels}[2][\lit@opt@defultarch]{%
+  \edef\@sourcearch{#1}%
+  \edef\@sourcename{#2}%
+  \@litmus@args@set%
+  \@litmuslabels%
+}
 \newrobustcmd{\@litmuslabels}{%
   \ebars\@litmuslabels@e|{\@sourcearch}{\@sourcename}{\@targetfigarchs}{\@targetarch}|
 }
